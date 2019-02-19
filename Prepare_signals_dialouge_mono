@@ -1,3 +1,0 @@
-rm data/signals/dialogues_mono/*;
-for file in $(find /homes/jack/ADOS_AudioNoiseout/Doc_audio -iname "*.wav"); do name=${file##*/}; cp $file data/signals/dialogues_mono/${name/.wav/.d.wav}; done
-for file in $(find /homes/jack/ADOS_AudioNoiseout/Kid_audio -iname "*.wav"); do name=${file##*/}; cp $file data/signals/dialogues_mono/${name/.wav/.k.wav}; done
