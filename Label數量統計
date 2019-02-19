@@ -1,0 +1,67 @@
+ADOS data distribution
+
+jack@biic-199:~/Interspeech2019/lstm_turn_taking_prediction$ python scripts/find_onsets.py 
+num of instances: 3868
+num short_count: 471
+num long_count: 1162
+
+
+jack@biic-199:~/Interspeech2019/lstm_turn_taking_prediction$ python scripts/find_overlaps.py 
+num of instances: 342
+num hold_count: 104
+num shift_count: 171
+num exclusive hold_count: 79
+num exclusive shift_count: 139
+
+
+jack@biic-199:~/Interspeech2019/lstm_turn_taking_prediction$ python scripts/find_pauses.py 
+50ms
+num of instances: 3197
+num Uncertain: 20
+num of instances where only one speaker continued: 1869
+num holds: 836
+num shifts: 1033
+250ms
+num of instances: 2318
+num Uncertain: 14
+num of instances where only one speaker continued: 1222
+num holds: 551
+num shifts: 671
+500ms
+num of instances: 1824
+num Uncertain: 11
+num of instances where only one speaker continued: 881
+num holds: 410
+num shifts: 471
+
+
+MAPTASK distribution
+jack@biic-199:~/lstm_turn_taking_prediction$ python scripts/find_onsets.py
+num of instances: 6880
+num short_count: 879
+num long_count: 655
+jack@biic-199:~/lstm_turn_taking_prediction$ python scripts/find_overlaps.py
+num of instances: 1039
+num hold_count: 463
+num shift_count: 442
+num exclusive hold_count: 379
+num exclusive shift_count: 343
+jack@biic-199:~/lstm_turn_taking_prediction$ python scripts/find_pauses.py 
+50ms
+num of instances: 31547
+num Uncertain: 186
+num of instances where only one speaker continued: 22074
+num holds: 13534
+num shifts: 8540
+250ms
+num of instances: 21470
+num Uncertain: 116
+num of instances where only one speaker continued: 15123
+num holds: 8805
+num shifts: 6318
+500ms
+num of instances: 13058
+num Uncertain: 63
+num of instances where only one speaker continued: 9174
+num holds: 5136
+num shifts: 4038
