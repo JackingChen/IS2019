@@ -19,8 +19,8 @@ import itertools
 seq_length = 600
 no_subnets = False
 OVRLPS=False
-#experiment_top_path = './two_subnets_Model0_validate_{0}/'
-experiment_top_path = './two_subnets_Model0_comb2_new_{0}/'
+experiment_top_path = './two_subnets_Model0_10fold_{0}/'
+#experiment_top_path = './two_subnets_Model0_comb2_{0}/'
 Model=experiment_top_path.strip("./").split("_")[2]
 
 plat = platform.linux_distribution()[0]
@@ -42,31 +42,48 @@ patience = 10
 slow_test = True
 prediction_length=60
 
-combination=2
-ADOS_id=[['adircta'],['DMSpc0'],['DMSpc12'],['DMSpc4'],['DMSpcD'],['DMStC'],['IEDtT'],['IEDtT'],['IEDtTA'],['PALft'],['PALmsE'],['PALtTA'],['r_rpsty'],['r_var'],['rp_comis'],['SOCmM'],['SWMtE']]
+#combination=2
 
+
+#Comb 2 session
 #ADOS_id=[list(i) for i in ADOS_id]
-returns=list(itertools.combinations(ADOS_id,combination))
-returns_lists=[]
-for i in returns:
-    lst=[]
-    for q in i:
-        lst+=list(q)
-    returns_lists.append(lst)
+#returns=list(itertools.combinations(ADOS_id,combination))
+#returns_lists=[]
+#for i in returns:
+#    lst=[]
+#    for q in i:
+#        lst+=list(q)
+#    returns_lists.append(lst)
 
-#Delete the tried sequence
-#for ret_lst in returns_lists:    
-#    if ret_lst in exclude_lists:
-#        returns_lists.remove(ret_lst)
 
+
+returns_lists=returns_lists=returns_lists=[
+ ['adircta'],
+ ['DMSpc0'],
+ ['DMSpc12'],
+ ['DMSpc4'],
+ ['DMSpcD'],
+ ['DMStC'],
+ ['IEDtE'],
+ ['IEDtT'],
+ ['IEDtTA'],
+ ['PALft'],
+ ['PALmsE'],
+ ['PALtTA'],
+ ['r_rpsty'],
+ ['r_var'],
+ ['rp_comis'],
+ ['SOCmM'],
+ ['SWMtE'],
+ ]
 
 for id_features in returns_lists:
-    for training_i in range(5):        
+    for training_i in range(10):        
         #    for prediction_length in range(90,180,30):
     #    train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
     #    test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
-        train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
-        test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
+        train_list_path = './data/splits10/training_{0}.txt'.format(training_i%10)
+        test_list_path = './data/splits10/testing_{0}.txt'.format(training_i%10)
         # train_list_path = './data/splits/training_dev_small.txt'
         # test_list_path = './data/splits/testing_dev_small.txt'
         

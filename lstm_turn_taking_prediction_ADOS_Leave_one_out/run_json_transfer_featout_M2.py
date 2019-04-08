@@ -6,7 +6,7 @@ import h5py
 #    warnings.filterwarnings("ignore",category=FutureWarning)
 #    import h5py
 from data_loader import TurnPredictionDataset
-from lstm_model import LSTMPredictor
+from lstm_model_M2 import LSTMPredictor
 from torch.nn.utils import clip_grad_norm
 import torch
 from torch.autograd import Variable
@@ -35,6 +35,7 @@ from sys import argv
 import json
 from random import randint
 import os
+from pytorchCenterLoss.center_loss import CenterLoss
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 import feature_vars as feat_dicts
@@ -56,7 +57,7 @@ alpha = 0.99  # smoothing constant
 init_std = 0.5
 momentum = 0
 test_batch_size = 1  # this should stay fixed at 1 when using slow test because the batches are already set in the data loader
-OVERLAPS=False
+OVERLAPS=True
 # sequence_length = 800
 # dropout = 0
 prediction_length = 60  # (3 seconds of prediction)
@@ -65,7 +66,7 @@ num_layers = 1
 onset_test_flag = True
 annotations_dir = './data/extracted_annotations/voice_activity/'
 
-#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50"}], "results_dir": "./no_subnets_transfer_1/1_Acous_50ms_baseline/test/", "name_append": "4_1_Acous_50ms_baseline_m_60_lr_01_l2e_0_l2o_-05_l2m_0001_dmo_5_dmi__seq_600", "no_subnets": true, "hidden_nodes_master": 60, "hidden_nodes_acous": 0, "hidden_nodes_visual": 0, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 1500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_2.txt", "test_list_path": "./data/splits/testing_2.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-05, "master": 0.0001, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}}']
+#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50", "visual_as_id": false}, {"folder_path": "./data/extracted_Identities/", "features": ["dia_num"], "modality": "visual", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "wrd_reg", "title_string": "_id", "use_glove": false, "glove_embed_table": "", "visual_as_id": true}], "results_dir": "./two_subnets_Model0_0_60/1+3_ADOS_dia_num/test/", "name_append": "0_1+3_ADOS_dia_num_m_60_a_60_v_2_lr_01_l2e_0_l2o_-07_l2m_-05_l2a__l2v__dmo_5_dmi_25_dao__dai__dvo_0_dvi__seq_600", "no_subnets": false, "hidden_nodes_master": 60, "hidden_nodes_acous": 60, "hidden_nodes_visual": 2, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_0.txt", "test_list_path": "./data/splits/testing_0.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-07, "master": 1e-05, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0.25, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}, "prediction_length": 60}']
 
 proper_num_args = 2
 print('Number of arguments is: ' + str(len(argv)))
@@ -331,277 +332,56 @@ loss_func_L1_no_reduce = nn.L1Loss(reduce=False)
 loss_func_BCE = nn.BCELoss()
 loss_func_BCE_Logit = nn.BCEWithLogitsLoss()
 
-
-# %% Test function
-def test():
-    losses_test = list()
-    results_dict = dict()
-    losses_dict = dict()
-    batch_sizes = list()
-    losses_mse, losses_l1 = [], []
-    model.eval()
-    # setup results_dict
-    results_lengths = test_dataset.get_results_lengths()
-    for file_name in test_file_list:
-        #        for g_f in ['g','f']:
-        for g_f in data_select_dict[data_set_select]:
-            # create new arrays for the results
-            results_dict[file_name + '/' + g_f] = np.zeros([results_lengths[file_name], prediction_length])
-            losses_dict[file_name + '/' + g_f] = np.zeros([results_lengths[file_name], prediction_length])
-
-    for batch_indx, batch in enumerate(test_dataloader):
-
-        model_input = []
-
-        for b_i, bat in enumerate(batch):
-            if len(bat) == 0:
-                model_input.append(bat)
-            elif (b_i == 1) or (b_i == 3):
-                model_input.append(torch.squeeze(bat, 0).transpose(0, 2).transpose(1, 2).numpy())
-            elif (b_i == 0) or (b_i == 2):
-                model_input.append(Variable(torch.squeeze(bat, 0).type(dtype)).transpose(0, 2).transpose(1, 2))
-
-        y_test = Variable(torch.squeeze(batch[4].type(dtype), 0))
-
-        info_test = batch[-1]
-        batch_length = int(info_test['batch_size'])
-        if batch_indx == 0:
-            model.change_batch_size_reset_states(batch_length)
-        else:
-            if slow_test:
-                model.change_batch_size_no_reset(batch_length)
-            else:
-                model.change_batch_size_reset_states(batch_length)
-
-        out_test = model(model_input)
-        out_test = torch.transpose(out_test, 0, 1)
-        
-
-        
-        if test_dataset.set_type == 'test':
-            file_name_list = [info_test['file_names'][i][0] for i in range(len(info_test['file_names']))]
-            gf_name_list = [info_test['g_f'][i][0] for i in range(len(info_test['g_f']))]
-            time_index_list = [info_test['time_indices'][i][0] for i in range(len(info_test['time_indices']))]
-        else:
-            file_name_list = info_test['file_names']
-            gf_name_list = info_test['g_f']
-            time_index_list = info_test['time_indices']
-
-        # Should be able to make other loss calculations faster
-        # Too many calls to transpose as well. Should clean up loss pipeline
-        y_test = y_test.permute(2, 0, 1)
-        loss_no_reduce = loss_func_L1_no_reduce(out_test, y_test.transpose(0, 1))
-
-        for file_name, g_f_indx, time_indices, batch_indx in zip(file_name_list,
-                                                                 gf_name_list,
-                                                                 time_index_list,
-                                                                 range(batch_length)):
-
-            results_dict[file_name + '/' + g_f_indx][time_indices[0]:time_indices[1]] = out_test[
-                batch_indx].data.cpu().numpy()
-            losses_dict[file_name + '/' + g_f_indx][time_indices[0]:time_indices[1]] = loss_no_reduce[
-                batch_indx].data.cpu().numpy()
-
-#        loss = loss_func_BCE(F.sigmoid(out_test), y_test.transpose(0, 1))
-        loss = loss_func_BCE_Logit(out_test,y_test.transpose(0,1))
-        losses_test.append(loss.data.cpu().numpy())
-        batch_sizes.append(batch_length)
-
-        loss_l1 = loss_func_L1(out_test, y_test.transpose(0, 1))
-        losses_l1.append(loss_l1.data.cpu().numpy())
-
-    # get weighted mean
-    loss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_test))) / np.sum(batch_sizes)
-    loss_weighted_mean_l1 = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_l1))) / np.sum(batch_sizes)
-    #    loss_weighted_mean_mse = np.sum( np.array(batch_sizes)*np.squeeze(np.array(losses_mse))) / np.sum( batch_sizes )
-
-    for conv_key in test_file_list:
-
-        results_dict[conv_key + '/' + data_select_dict[data_set_select][1]] = np.array(
-            results_dict[conv_key + '/' + data_select_dict[data_set_select][1]]).reshape(-1, prediction_length)
-        results_dict[conv_key + '/' + data_select_dict[data_set_select][0]] = np.array(
-            results_dict[conv_key + '/' + data_select_dict[data_set_select][0]]).reshape(-1, prediction_length)
-
-    # get hold-shift f-scores 
-    for pause_str in pause_str_list:
-        true_vals = list()
-        predicted_class = list()
-        for conv_key in test_file_list:
-            for g_f_key in list(hold_shift[pause_str + '/hold_shift' + '/' + conv_key].keys()):
-                g_f_key_not = deepcopy(data_select_dict[data_set_select])
-                g_f_key_not.remove(g_f_key)
-                for frame_indx, true_val in hold_shift[pause_str + '/hold_shift' + '/' + conv_key + '/' + g_f_key]:
-                    # make sure the index is not out of bounds
-                    if frame_indx < len(results_dict[conv_key + '/' + g_f_key]):
-                        true_vals.append(true_val)
-                        if np.sum(
-                                results_dict[conv_key + '/' + g_f_key][frame_indx, 0:length_of_future_window]) > np.sum(
-                                results_dict[conv_key + '/' + g_f_key_not[0]][frame_indx, 0:length_of_future_window]):
-                            predicted_class.append(0)
-                        else:
-                            predicted_class.append(1)
-        f_score = f1_score(true_vals, predicted_class, average='weighted')
-        results_save['f_scores_' + pause_str].append(f_score)
-        if (len(set(true_vals))>=2):
-            tn, fp, fn, tp = confusion_matrix(true_vals, predicted_class).ravel()
-        elif  (len(set(true_vals))==1):
-            if true_vals == predicted_class:
-                if true_vals[0]==0:
-                    tn, fp, fn, tp = 0,0,1,0
-                elif true_vals[0]==1:
-                    tn, fp, fn, tp = 0,0,0,1
-            else:
-                if true_vals[0]==0:
-                    tn, fp, fn, tp = 0,1,0,0
-                elif true_vals[0]==1:
-                    tn, fp, fn, tp = 1,0,0,0
-        else:
-            tn, fp, fn, tp = 0,0,0,0
-        results_save['tn_' + pause_str].append(tn)
-        results_save['fp_' + pause_str].append(fp)
-        results_save['fn_' + pause_str].append(fn)
-        results_save['tp_' + pause_str].append(tp)
-        print('majority vote f-score(' + pause_str + '):' + str(
-            f1_score(true_vals, np.zeros([len(predicted_class)]).tolist(), average='weighted')))
-    # get prediction at onset f-scores 
-    # first get best threshold from training data
-    if onset_test_flag:
-        onset_train_true_vals = list()
-        onset_train_mean_vals = list()
-        onset_threshs = []
-        for conv_key in list(set(train_file_list).intersection(onsets['short_long'].keys())):
-            for g_f_key in list(onsets['short_long' + '/' + conv_key].keys()):
-                g_f_key_not = deepcopy(data_select_dict[data_set_select])
-                g_f_key_not.remove(g_f_key)
-                for frame_indx, true_val in onsets['short_long' + '/' + conv_key + '/' + g_f_key]:
-                    # make sure the index is not out of bounds
-
-                    if (frame_indx < len(train_results_dict[conv_key + '/' + g_f_key])) and not (
-                    np.isnan(np.mean(train_results_dict[conv_key + '/' + g_f_key][frame_indx, :]))):
-                        onset_train_true_vals.append(true_val)
-                        onset_train_mean_vals.append(
-                            np.mean(train_results_dict[conv_key + '/' + g_f_key][frame_indx, :]))
-        if not(len(onset_train_true_vals)==0):
-            fpr, tpr, thresholds = roc_curve(np.array(onset_train_true_vals), np.array(onset_train_mean_vals))
-        else:
-            fpr,tpr,thresholds = 0,0,[0]
-        thresh_indx = np.argmax(tpr - fpr)
-        onset_thresh = thresholds[thresh_indx]
-        onset_threshs.append(onset_thresh)
-
-        true_vals_onset, onset_test_mean_vals, predicted_class_onset = [], [], []
-        for conv_key in list(set(test_file_list).intersection(onsets['short_long'].keys())):
-            for g_f_key in list(onsets['short_long' + '/' + conv_key].keys()):
-                #                g_f_key_not = ['g','f']
-                g_f_key_not = deepcopy(data_select_dict[data_set_select])
-                g_f_key_not.remove(g_f_key)
-                for frame_indx, true_val in onsets['short_long' + '/' + conv_key + '/' + g_f_key]:
-                    # make sure the index is not out of bounds
-                    if (frame_indx < len(results_dict[conv_key + '/' + g_f_key])) and not (
-                    np.isnan(np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :]))):
-                        true_vals_onset.append(true_val)
-                        onset_mean = np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :])
-                        onset_test_mean_vals.append(onset_mean)
-                        if onset_mean > onset_thresh:
-                            predicted_class_onset.append(1)  # long
-                        else:
-                            predicted_class_onset.append(0)  # short
-        f_score = f1_score(true_vals_onset, predicted_class_onset, average='weighted')
-        print(onset_str_list[0] + ' f-score: ' + str(f_score))
-        print('majority vote f-score:' + str(
-            f1_score(true_vals_onset, np.zeros([len(true_vals_onset), ]).tolist(), average='weighted')))
-        results_save['f_scores_' + onset_str_list[0]].append(f_score)
-        if not(len(true_vals_onset) == 0):
-            tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
-        else:
-            tn,fp,fn,tp, = 0,0,0,0
-        results_save['tn_' + onset_str_list[0]].append(tn)
-        results_save['fp_' + onset_str_list[0]].append(fp)
-        results_save['fn_' + onset_str_list[0]].append(fn)
-        results_save['tp_' + onset_str_list[0]].append(tp)
-
-    # get prediction at overlap f-scores
-
-    for overlap_str in overlap_str_list:
-        true_vals_overlap, predicted_class_overlap = [], []
-
-        for conv_key in list(set(list(overlaps[overlap_str].keys())).intersection(set(test_file_list))):
-            for g_f_key in list(overlaps[overlap_str + '/' + conv_key].keys()):
-                g_f_key_not = deepcopy(data_select_dict[data_set_select])
-                g_f_key_not.remove(g_f_key)
-                for eval_indx, true_val in overlaps[overlap_str + '/' + conv_key + '/' + g_f_key]:
-                    # make sure the index is not out of bounds
-                    if eval_indx < len(results_dict[conv_key + '/' + g_f_key]):
-                        true_vals_overlap.append(true_val)
-                        if np.sum(results_dict[conv_key + '/' + g_f_key][eval_indx,
-                                  eval_window_start_point: eval_window_start_point + eval_window_length]) \
-                                > np.sum(results_dict[conv_key + '/' + g_f_key_not[0]][eval_indx,
-                                         eval_window_start_point: eval_window_start_point + eval_window_length]):
-                            predicted_class_overlap.append(0)
-                        else:
-                            predicted_class_overlap.append(1)
-        f_score = f1_score(true_vals_overlap, predicted_class_overlap, average='weighted')
-        print(overlap_str + ' f-score: ' + str(f_score))
-
-        print('majority vote f-score:' + str(
-            f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
-        results_save['f_scores_' + overlap_str].append(f_score)
-        tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
-        results_save['tn_' + overlap_str].append(tn)
-        results_save['fp_' + overlap_str].append(fp)
-        results_save['fn_' + overlap_str].append(fn)
-        results_save['tp_' + overlap_str].append(tp)
-    # get error per person
-    bar_chart_labels = []
-    bar_chart_vals = []
-    for conv_key in test_file_list:
-        #        for g_f in ['g','f']:
-        for g_f in data_select_dict[data_set_select]:
-            losses_dict[conv_key + '/' + g_f] = np.array(losses_dict[conv_key + '/' + g_f]).reshape(-1,
-                                                                                                    prediction_length)
-            bar_chart_labels.append(conv_key + '_' + g_f)
-            bar_chart_vals.append(np.mean(losses_dict[conv_key + '/' + g_f]))
-
-    results_save['test_losses'].append(loss_weighted_mean)
-    results_save['test_losses_l1'].append(loss_weighted_mean_l1)
-    #    results_save['test_losses_mse'].append(loss_weighted_mean_mse)
-
-    indiv_perf = {'bar_chart_labels': bar_chart_labels,
-                  'bar_chart_vals': bar_chart_vals}
-    results_save['indiv_perf'].append(indiv_perf)
-    # majority baseline:
-    # f1_score(true_vals,np.zeros([len(true_vals),]).tolist(),average='weighted')
-
-
 # %% Init model
+# model = LSTMPredictor(feature_size_dict, hidden_nodes, num_layers,train_batch_size,sequence_length,prediction_length,train_dataset.get_embedding_info(),dropout=dropout)
 embedding_info = train_dataset.get_embedding_info()
 #import glob
-#PATH="./model_save/checkpoint_{0}.pkl".format(prediction_length)
-PATH="./model_save/checkpoint.pkl"
-fileexists = os. path. isfile(PATH)
+fileexists = os. path. isfile('./model_save/checkpoint_60.pkl')
 
 optimizer_list = []
 if fileexists:
     model = LSTMPredictor(lstm_settings_dict=lstm_settings_dict, feature_size_dict=feature_size_dict,
                           batch_size=train_batch_size, seq_length=sequence_length, prediction_length=prediction_length,
                           embedding_info=embedding_info)
-    
-    
+
+    PATH="./model_save/checkpoint_60.pkl"
+    print("Transfer learning: Initialize with model {0}".format(PATH))
     checkpoint = torch.load(PATH)
-    model.load_state_dict(checkpoint['model_state_dict'])
+#    model.load_state_dict(checkpoint['model_state_dict'])
+    # =============================================================================
+    #     Load hidden state
+    # =============================================================================
+    model.state_dict()['lstm_acous.bias_ih_l0']=checkpoint['model_state_dict']['lstm_master.bias_ih_l0']
+    model.state_dict()['lstm_acous.bias_hh_l0']=checkpoint['model_state_dict']['lstm_master.bias_hh_l0']
+    model.state_dict()['lstm_acous.weight_ih_l0']=checkpoint['model_state_dict']['lstm_master.weight_ih_l0']
+    model.state_dict()['lstm_acous.weight_hh_l0']=checkpoint['model_state_dict']['lstm_master.weight_hh_l0']
+    # =============================================================================
+    #     Load out state
+    # =============================================================================
+    model.state_dict()['out.weight']=checkpoint['model_state_dict']['out.weight']
+    model.state_dict()['out.bias']=checkpoint['model_state_dict']['out.bias']
+
     
     optimizer_list.append( optim.Adam( model.out.parameters(), lr=learning_rate, weight_decay=l2_dict['out'] ) )
+    optimizer_list[0].load_state_dict(checkpoint['optimizer_state_dict0'])#optimizer_state_dict0 = the out optimizer
     for lstm_key in model.lstm_dict.keys():
         optim_instance=optim.Adam(model.lstm_dict[lstm_key].parameters( ))
+        if lstm_key == 'acous':
+            optim_instance.load_state_dict(checkpoint['optimizer_state_dict1']) #optimizer_state_dict1 = the acous optimizer
 #        optim_instance.add_param_group({"params": torch.tensor([0])})        
         optimizer_list.append(optim_instance)              
-    for i,optimizer in enumerate(optimizer_list):
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'+str(i)])
+
     epoch = checkpoint['epoch']
     loss = checkpoint['loss']
     
     model.eval()
-
+    
+#    model = torch.load('./model_save/Model.pkl')
+##    model.eval()
+#    
+#    for file in sorted(glob.glob("./model_save/optimizer*")):
+#        optimizer=torch.load(file)
+#        optimizer_list.append(optimizer)
     
 else:
     model = LSTMPredictor(lstm_settings_dict=lstm_settings_dict, feature_size_dict=feature_size_dict,
@@ -640,7 +420,7 @@ if OVERLAPS:
         results_save['tp_k_' + pause_str] = list()
 else:
     for pause_str in pause_str_list  + onset_str_list:
-        results_save['f_scores_' + pause_str] = list()        
+        results_save['f_scores_' + pause_str] = list()   
         results_save['tn_' + pause_str] = list()
         results_save['fp_' + pause_str] = list()
         results_save['fn_' + pause_str] = list()
@@ -651,14 +431,51 @@ else:
         results_save['fn_k_' + pause_str] = list()
         results_save['tp_k_' + pause_str] = list()
 results_save['train_losses'], results_save['test_losses'], results_save['indiv_perf'], results_save[
-    'test_losses_l1'] = [], [], [], []
+    'test_losses_l1'], results_save['center_losses_train'],results_save['BCE_losses_train'],results_save[
+    'center_losses_test'],results_save['BCE_losses_test'] = [], [], [], [], [],[],[],[]
+# =============================================================================
+'''
+    Center loss init
+'''
+# =============================================================================
+from sklearn.mixture import GaussianMixture
+import pickle
+import pandas as pd
+labels=pd.read_excel('/home/jack/lstm_turn_taking_prediction_ADOS/Feature_ADOS.xlsx')
+#label_name=feature_dict_list[1]['features']
+label_name='dia_num'
+if label_name == 'dia_num':
+    label_array=np.array(labels[label_name])
+    class_num=3
+else:
+    class_num=2
+    covar_type='full'
+    label=labels[label_name].fillna(0)
+    classifier=GaussianMixture(n_components=class_num,covariance_type=covar_type)
+    classifier.fit(label)
+    label_array=classifier.predict(label)
 
 
+Dict_label={}
+for i, lab in enumerate(labels['name']):
+    Dict_label[lab]=label_array[i]
+
+
+
+
+#center_loss = CenterLoss(num_classes=class_num, feat_dim=hidden_nodes_acous, use_gpu=True)
+center_loss = CenterLoss(num_classes=class_num, feat_dim=hidden_nodes_acous*sequence_length, use_gpu=True)
+optimizer_centloss = torch.optim.Adam(center_loss.parameters(), lr=0.5)
+optimizer_list.append(optimizer_centloss)
+
+alpha=1
 # %% Training
 for epoch in range(0, num_epochs):
     model.train()
     t_epoch_strt = t.time()
+    BCE_loss_list = []
     loss_list = []
+    Center_loss_list = []
     model.change_batch_size_reset_states(train_batch_size)
 
     if onset_test_flag:
@@ -677,9 +494,9 @@ for epoch in range(0, num_epochs):
         # b should be of form: (x,x_i,v,v_i,y,info)
         model.init_hidden()
         model.zero_grad()
+        optimizer_centloss.zero_grad()
         model_input = []
-
-        model_input = []
+        
 
         for b_i, bat in enumerate(batch):
             if len(bat) == 0:
@@ -691,20 +508,43 @@ for epoch in range(0, num_epochs):
 
         y = Variable(batch[4].type(dtype).transpose(0, 2).transpose(1, 2))
         info = batch[5]
-        model_output_logits = model(model_input)
-        
-
+        features, model_output_logits = model(model_input)
+        #Collect center label by lookup table
+        center_label=[]
+        for i,fle_nmes in enumerate(info['file_names']):
+            center_label.append(Dict_label[fle_nmes])
+        center_label=torch.LongTensor(center_label).to(torch.cuda.current_device())
         #        model_output_logits = model(model_input[0],model_input[1],model_input[2],model_input[3])
 
-        # loss = loss_func_BCE(F.sigmoid(model_output_logits), y)        
-        loss = loss_func_BCE_Logit(model_output_logits,y)
+        # loss = loss_func_BCE(F.sigmoid(model_output_logits), y)    
+        BCE_Logit_loss = loss_func_BCE_Logit(model_output_logits,y)
+#        center_loss_record_bag=[]
+#        for iii in range(600):
+#            center_loss_record=center_loss(features.transpose(0,1)[:,iii,:], center_label)
+#            center_loss_record_bag.append(center_loss_record)
+#        center_loss_record_mean = torch.stack(center_loss_record_bag).mean()
+        center_loss_record2=center_loss(features.view(features.size(1),-1), center_label)/sequence_length
+        
+        
+        loss =  center_loss_record2  * alpha + BCE_Logit_loss
+        
+        
+        
+        
+        
 #        if np.isnan(loss):
 #            aaa=ccc        
+        BCE_loss_list.append(BCE_Logit_loss.cpu().data.numpy())
+        Center_loss_list.append(center_loss_record2.cpu().data.numpy())
         loss_list.append(loss.cpu().data.numpy())
         loss.backward()
         #        optimizer.step()
         if grad_clip_bool:
             clip_grad_norm(model.parameters(), grad_clip)
+        ###########Individual optimizer#########
+        for param in center_loss.parameters(): 
+            param.grad.data *= (1./alpha)
+        ########################################
         for i,opt in enumerate(optimizer_list):
             opt.step()
         if onset_test_flag:
@@ -723,6 +563,8 @@ for epoch in range(0, num_epochs):
                     batch_indx].data.cpu().numpy()
 
     results_save['train_losses'].append(np.mean(loss_list))
+    results_save['center_losses_train'].append(np.mean(Center_loss_list))
+    results_save['BCE_losses_train'].append(np.mean(BCE_loss_list))
     
     
 # =============================================================================
@@ -731,6 +573,8 @@ for epoch in range(0, num_epochs):
     t_epoch_end = t.time()
     model.eval()
     losses_test = list()
+    BCElosses_test = list()
+    Center_losses_test = list()
     results_dict = dict()
     losses_dict = dict()
     batch_sizes = list()
@@ -778,7 +622,7 @@ for epoch in range(0, num_epochs):
             else:
                 model.change_batch_size_reset_states(batch_length)
 
-        out_test = model(model_input)
+        features, out_test = model(model_input)
         out_test = torch.transpose(out_test, 0, 1)
         
 
@@ -796,7 +640,12 @@ for epoch in range(0, num_epochs):
         # Too many calls to transpose as well. Should clean up loss pipeline
         y_test = y_test.permute(2, 0, 1)
         loss_no_reduce = loss_func_L1_no_reduce(out_test, y_test.transpose(0, 1))
-
+        
+        center_label=[]
+        for i,fle_nmes in enumerate(file_name_list):
+            center_label.append(Dict_label[fle_nmes])
+        center_label=torch.LongTensor(center_label).to(torch.cuda.current_device())
+        
         for file_name, g_f_indx, time_indices, batch_indx in zip(file_name_list,
                                                                  gf_name_list,
                                                                  time_index_list,
@@ -808,23 +657,37 @@ for epoch in range(0, num_epochs):
                 batch_indx].data.cpu().numpy()
 
 #        loss = loss_func_BCE(F.sigmoid(out_test), y_test.transpose(0, 1))
-        loss = loss_func_BCE_Logit(out_test,y_test.transpose(0,1))
+        BCE_Logit_loss = loss_func_BCE_Logit(out_test,y_test.transpose(0,1))
+        center_loss_test=center_loss(features.view(features.size(1),-1), center_label)/sequence_length
+        loss =  center_loss_test  * alpha + BCE_Logit_loss
+        
+        BCElosses_test.append(BCE_Logit_loss.data.cpu().numpy())
+        Center_losses_test.append(center_loss_test.data.cpu().numpy())
         losses_test.append(loss.data.cpu().numpy())
+        
         batch_sizes.append(batch_length)
 
         loss_l1 = loss_func_L1(out_test, y_test.transpose(0, 1))
         losses_l1.append(loss_l1.data.cpu().numpy())
+        
+        
+
+        
         
 # =============================================================================
 #       Save the features  
 # =============================================================================
         hiddenmasterh_bag.append(model.hiddenmaster1[0].squeeze().view(-1).cpu().data.numpy())
         hiddenmasterc_bag.append(model.hiddenmaster1[1].squeeze().view(-1).cpu().data.numpy())
+        hiddenacoush_bag.append(model.hiddenacous1[0].squeeze().view(-1).cpu().data.numpy())
+        hiddenacousc_bag.append(model.hiddenacous1[1].squeeze().view(-1).cpu().data.numpy())
         outmaster_bag.append(model.outmaster1[-1,:,:].view(-1).cpu().data.numpy())
-
+        outacous_bag.append(model.outacous1[-1,:,:].view(-1).cpu().data.numpy())
 
     # get weighted mean
     loss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_test))) / np.sum(batch_sizes)
+    Center_loss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(Center_losses_test))) / np.sum(batch_sizes)
+    BCEloss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(BCElosses_test))) / np.sum(batch_sizes)
     loss_weighted_mean_l1 = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_l1))) / np.sum(batch_sizes)
     #    loss_weighted_mean_mse = np.sum( np.array(batch_sizes)*np.squeeze(np.array(losses_mse))) / np.sum( batch_sizes )
 
@@ -869,7 +732,6 @@ for epoch in range(0, num_epochs):
         results_save['f_scores_' + pause_str].append(f_score)
         if (len(set(true_vals))>=2):
             tn, fp, fn, tp = confusion_matrix(true_vals, predicted_class).ravel()
-            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k, predicted_class_kid).ravel()
         elif  (len(set(true_vals))==1):
             if true_vals == predicted_class:
                 if true_vals[0]==0:
@@ -881,7 +743,13 @@ for epoch in range(0, num_epochs):
                     tn, fp, fn, tp = 0,1,0,0
                 elif true_vals[0]==1:
                     tn, fp, fn, tp = 1,0,0,0
-            
+        else:
+            tn, fp, fn, tp = 0,0,0,0
+
+        
+        if (len(set(true_vals_k))>=2):
+            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k, predicted_class_kid).ravel()
+        elif  (len(set(true_vals_k))==1):
             if true_vals_k == predicted_class_kid:
                 if true_vals_k[0]==0:
                     tn_k, fp_k, fn_k, tp_k = 0,0,1,0
@@ -893,8 +761,9 @@ for epoch in range(0, num_epochs):
                 elif true_vals_k[0]==1:
                     tn_k, fp_k, fn_k, tp_k = 1,0,0,0
         else:
-            tn, fp, fn, tp = 0,0,0,0
             tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+
+        
         results_save['tn_' + pause_str].append(tn)
         results_save['fp_' + pause_str].append(fp)
         results_save['fn_' + pause_str].append(fn)
@@ -931,7 +800,7 @@ for epoch in range(0, num_epochs):
         thresh_indx = np.argmax(tpr - fpr)
         onset_thresh = thresholds[thresh_indx]
         onset_threshs.append(onset_thresh)
-        
+
         true_vals_onset, onset_test_mean_vals, predicted_class_onset, true_vals_k_onset,  predicted_class_kid_onset, onset_test_mean_vals_k= [], [], [], [], [], []
         for conv_key in list(set(test_file_list).intersection(onsets['short_long'].keys())):
             for g_f_key in list(onsets['short_long' + '/' + conv_key].keys()):
@@ -966,9 +835,9 @@ for epoch in range(0, num_epochs):
         print('majority vote f-score:' + str(
             f1_score(true_vals_onset, np.zeros([len(true_vals_onset), ]).tolist(), average='weighted')))
         results_save['f_scores_' + onset_str_list[0]].append(f_score)
+        
         if (len(set(true_vals_onset))>=2):
             tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
-            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k_onset, predicted_class_kid_onset).ravel()
         elif  (len(set(true_vals_onset))==1):
             if true_vals_onset == predicted_class_onset:
                 if true_vals_onset[0]==0:
@@ -980,8 +849,13 @@ for epoch in range(0, num_epochs):
                     tn, fp, fn, tp = 0,1,0,0
                 elif true_vals_onset[0]==1:
                     tn, fp, fn, tp = 1,0,0,0
-                    
-            if true_vals_k_onset == predicted_class_onset:
+        else:
+            tn,fp,fn,tp, = 0,0,0,0
+        
+        if (len(set(true_vals_k_onset))>=2):
+            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k_onset, predicted_class_kid_onset).ravel()
+        elif  (len(set(true_vals_k_onset))==1):
+            if predicted_class_kid_onset == true_vals_k_onset:
                 if true_vals_k_onset[0]==0:
                     tn_k, fp_k, fn_k, tp_k = 0,0,1,0
                 elif true_vals_k_onset[0]==1:
@@ -992,7 +866,9 @@ for epoch in range(0, num_epochs):
                 elif true_vals_k_onset[0]==1:
                     tn_k, fp_k, fn_k, tp_k = 1,0,0,0
         else:
-            tn,fp,fn,tp, = 0,0,0,0
+            tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+        
+
 #        if not(len(true_vals_onset) == 0):
 #            tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
 #        else:
@@ -1032,7 +908,22 @@ for epoch in range(0, num_epochs):
             print('majority vote f-score:' + str(
                 f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
             results_save['f_scores_' + overlap_str].append(f_score)
-            tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
+            if (len(set(true_vals_overlap))>=2):
+                tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
+            elif  (len(set(true_vals_overlap))==1):
+                if true_vals_overlap == predicted_class_overlap:
+                    if true_vals_overlap[0]==0:
+                        tn, fp, fn, tp = 0,0,1,0
+                    elif true_vals_overlap[0]==1:
+                        tn, fp, fn, tp = 0,0,0,1
+                else:
+                    if true_vals_overlap[0]==0:
+                        tn, fp, fn, tp = 0,1,0,0
+                    elif true_vals_overlap[0]==1:
+                        tn, fp, fn, tp = 1,0,0,0
+            else:
+                tn,fp,fn,tp, = 0,0,0,0
+            #tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
             results_save['tn_' + overlap_str].append(tn)
             results_save['fp_' + overlap_str].append(fp)
             results_save['fn_' + overlap_str].append(fn)
@@ -1048,6 +939,8 @@ for epoch in range(0, num_epochs):
             bar_chart_labels.append(conv_key + '_' + g_f)
             bar_chart_vals.append(np.mean(losses_dict[conv_key + '/' + g_f]))
 
+    results_save['center_losses_test'].append(Center_loss_weighted_mean)
+    results_save['BCE_losses_test'].append(BCEloss_weighted_mean)
     results_save['test_losses'].append(loss_weighted_mean)
     results_save['test_losses_l1'].append(loss_weighted_mean_l1)
     #    results_save['test_losses_mse'].append(loss_weighted_mean_mse)
@@ -1079,19 +972,24 @@ for epoch in range(0, num_epochs):
         '''
         # =============================================================================
         outname=train_list_path.replace(".txt",".pkl").split("/")[-1]
-        PATH="./feature_save_baseline/{0}".format(outname)
-        if not os.path.exists("./feature_save_baseline/"):
-            os.makedirs("./feature_save_baseline/")
+        PATH="./feature_save/{0}".format(outname)
+        if not os.path.exists("./feature_save/"):
+            os.makedirs("./feature_save/")
 
     
             
         feature_save={
             'hiddenmaster1': model.hiddenmaster1,
-#            'hiddenacous1': model.hiddenacous1,
+            'hiddenacous1': model.hiddenacous1,
+            'outmaster1': model.outmaster1,
+            'outacous1':model.outacous1,
             'hiddenmasterh_bag': hiddenmasterh_bag,
             'hiddenmasterc_bag': hiddenmasterc_bag,
-#            'hiddenacoush_bag': hiddenacoush_bag,
-#            'hiddenacousc_bag':hiddenacousc_bag,
+            'hiddenacoush_bag': hiddenacoush_bag,
+            'hiddenacousc_bag':hiddenacousc_bag,
+            'outmaster_bag': outmaster_bag,
+            'outacous_bag':outacous_bag,
+            'model':model
             }      
         torch.save(feature_save, PATH)
         break
@@ -1136,6 +1034,10 @@ else:
     for plot_str in pause_str_list  + onset_str_list:
         perf_plot(results_save, 'f_scores_' + plot_str)
 perf_plot(results_save, 'train_losses')
+perf_plot(results_save, 'center_losses_train')
+perf_plot(results_save, 'center_losses_test')
+perf_plot(results_save, 'BCE_losses_train')
+perf_plot(results_save, 'BCE_losses_test')
 perf_plot(results_save, 'test_losses')
 perf_plot(results_save, 'test_losses_l1')
 plt.close('all')

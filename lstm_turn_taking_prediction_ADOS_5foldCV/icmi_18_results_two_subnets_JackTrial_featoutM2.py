@@ -16,11 +16,12 @@ from time import gmtime, strftime
 # import shutil
 from random import randint
 import itertools
-seq_length = 600
+seq_length = 300
 no_subnets = False
 OVRLPS=False
-#experiment_top_path = './two_subnets_Model0_validate_{0}/'
-experiment_top_path = './two_subnets_Model0_comb2_new_{0}/'
+#experiment_top_path = './two_subnets_Model2_{0}/'
+experiment_top_path =  './two_subnets_Model2_MedianClass_{0}_Seq'+str(seq_length)+'/'
+#experiment_top_path = './two_subnets_Model0_comb2_{0}/'
 Model=experiment_top_path.strip("./").split("_")[2]
 
 plat = platform.linux_distribution()[0]
@@ -42,31 +43,154 @@ patience = 10
 slow_test = True
 prediction_length=60
 
-combination=2
-ADOS_id=[['adircta'],['DMSpc0'],['DMSpc12'],['DMSpc4'],['DMSpcD'],['DMStC'],['IEDtT'],['IEDtT'],['IEDtTA'],['PALft'],['PALmsE'],['PALtTA'],['r_rpsty'],['r_var'],['rp_comis'],['SOCmM'],['SWMtE']]
 
-#ADOS_id=[list(i) for i in ADOS_id]
-returns=list(itertools.combinations(ADOS_id,combination))
-returns_lists=[]
-for i in returns:
-    lst=[]
-    for q in i:
-        lst+=list(q)
-    returns_lists.append(lst)
 
-#Delete the tried sequence
-#for ret_lst in returns_lists:    
-#    if ret_lst in exclude_lists:
-#        returns_lists.remove(ret_lst)
-
+returns_lists=[
+ ['adircta'],
+ ['adircta1'],
+ ['adircta2'],
+ ['adircta3'],
+ ['adircta4'],
+ ['adirctb1'],
+ ['adirctb2'],
+ ['adirctb3'],
+ ['adirctc4'],
+# ['MOTmL'],
+# ['PRMmcL'],
+# ['PRMcN'],
+# ['PRMcP'],
+# ['SRMmcL'],
+# ['SRMcN'],
+# ['SRMcP'],
+ ['DMSA'],
+ ['DMSB'],
+ ['DMSmcLD'],
+ ['DMSmcLS'],
+ ['DMSpcD'],
+ ['DMSpcS'],
+ ['DMSpc0'],
+ ['DMSpc4'],
+ ['DMSpc12'],
+ ['DMSceP'],
+ ['DMSeeP'],
+ ['DMStC'],
+# ['DMStC', 'DMStCD'],
+# ['DMStC', 'DMStCS'],
+# ['DMStC', 'DMStC0'],
+# ['DMStC', 'DMStC4'],
+# ['DMStC', 'DMStC12'],
+ ['PALft'],
+ ['PALmsE'],
+ ['PALmsT'],
+ ['PALcS'],
+ ['PALftS'],
+ ['PALtE'],
+ ['PALtEA'],
+ ['PALtT'],
+ ['PALtTA'],
+ ['SSPsL'],
+ ['SSPtE'],
+ ['SSPtuE'],
+ ['SWMbE'],
+# ['SWMbE', 'SWMbE4'],
+# ['SWMbE', 'SWMbE6'],
+# ['SWMbE', 'SWMbE8'],
+ ['SWMdE'],
+# ['SWMdE', 'SWMdE4'],
+# ['SWMdE', 'SWMdE6'],
+# ['SWMdE', 'SWMdE8'],
+ ['SWMS'],
+ ['SWMtE'],
+# ['SWMwE', 'SWMwE4'],
+# ['SWMwE', 'SWMwE6'],
+# ['SWMwE', 'SWMwE8'],
+ ['SOCitT'],
+# ['SOCitT3', 'SOCitT'],
+# ['SOCitT4', 'SOCitT'],
+# ['SOCitT5', 'SOCitT'],
+ ['SOCmM'],
+# ['SOCmM3', 'SOCmM'],
+# ['SOCmM4', 'SOCmM'],
+# ['SOCmM5', 'SOCmM'],
+ ['SOCstT'],
+# ['SOCstT3', 'SOCstT'],
+# ['SOCstT4', 'SOCstT'],
+# ['SOCstT5', 'SOCstT'],
+ ['SOCpsmM'],
+# ['BLCmcL'],
+# ['BLCpC'],
+# ['BLCtC'],
+# ['BLCtE'],
+ ['IEDcsE'],
+ ['IEDcsT'],
+ ['IEDedE'],
+ ['IEDpedE'],
+ ['IEDcS'],
+ ['IEDtE'],
+ ['IEDtEA'],
+ ['IEDtT'],
+ ['IEDtTA'],
+ ['RTI5mT'],
+ ['RTI5rT'],
+ ['RTI1mT'],
+ ['RTI1rT'],
+ ['MTSmcL'],
+ ['MTSmeL'],
+ ['MTSmlC'],
+ ['MTSpC'],
+ ['MTStnC'],
+ ['RVPA'],
+ ['RVPB'],
+ ['RVPmL'],
+ ['RVPfaP'],
+ ['RVPhP'],
+ ['RVPrN'],
+ ['RVPfaN'],
+ ['RVPhN'],
+ ['RVPmN'],
+# ['SWMtE', 'SWMtE4'],
+# ['SWMtE', 'SWMtE6'],
+ ['SWMtE',],
+ ['SWMtE8'],
+ ['SOCmM'],
+ ['SOCitT'],
+ ['SOCstT'],
+ ['ca_sex'],
+ ['rn_omis'],
+ ['rp_omis'],
+ ['rn_comis'],
+ ['rp_comis'],
+ ['r_rt'],
+ ['r_rtsd'],
+ ['r_var'],
+ ['r_detect'],
+ ['r_rpsty'],
+ ['r_per'],
+ ['r_rtbc'],
+ ['r_sebc'],
+ ['r_rtisi'],
+ ['r_seisi'],
+ ['BRI'],
+# ['BRI2', 'BRI'],
+# ['BRI3', 'BRI'],
+# ['MI'],
+# ['MI2', 'MI'],
+# ['MI3', 'MI'],
+# ['MI4', 'MI'],
+# ['MI5', 'MI'],
+# ['BRI'],
+ ['MI'],
+ ['GEC'],
+ ['dia_num']
+ ]
 
 for id_features in returns_lists:
     for training_i in range(5):        
         #    for prediction_length in range(90,180,30):
     #    train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
     #    test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
-        train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
-        test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
+        train_list_path = './data/splits/training_{0}.txt'.format(training_i)
+        test_list_path = './data/splits/testing_{0}.txt'.format(training_i)
         # train_list_path = './data/splits/training_dev_small.txt'
         # test_list_path = './data/splits/testing_dev_small.txt'
         
@@ -412,7 +536,7 @@ for id_features in returns_lists:
                     json_dict = json.dumps(json_dict)
                     arg_list = [json_dict]
                     my_env = {'CUDA_VISIBLE_DEVICES': str(gpu_select)}
-                    command = [py_env, './run_json_transfer.py'] + arg_list
+                    command = [py_env, './run_json_transfer_featout_M2.py'] + arg_list
     #                command = [py_env, './run_json_transfer.py'] + arg_list
                     print(command)
                     print('\n *** \n')
@@ -484,22 +608,6 @@ for id_features in returns_lists:
                            }
         
             json.dump(report_dict, open(trial_path + '/report_dict.json', 'w'), indent=4, sort_keys=True)
-
-
-# create folder within loop number
-
-# %% run multiprocessing
-
-#param_list = []
-#for experiment_name, experiment_features_list, experiment_settings in zip(experiment_name_list,
-#                                                                          experiment_features_lists,
-#                                                                          experiment_settings_list):
-#    param_list.append([experiment_name, experiment_features_list, experiment_settings])
-#
-## if __name__=='__main__':
-##    p = multiprocessing.Pool(num_workers)
-##    p.map(run_trial,param_list)   
-#for params in param_list:
-#    run_trial(params)
-
-
+            name=experiment_name.replace("1+3_ADOS_","")
+subprocess.run('python ./feature_save/Aggregate_pkl.py {0}'.format(name),shell=True)
+subprocess.run('rm /home/jack/lstm_turn_taking_prediction_ADOS/feature_save/*.pkl',shell=True)

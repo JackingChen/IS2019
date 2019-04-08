@@ -92,7 +92,81 @@ for i in returns:
 #    returns_lists.append(lst)
 
 #for training_i in range(3,5,1):
-returns_lists=[['DMSceP',	'DMSeeP']]
+returns_lists=returns_lists=[['adircta'],
+ ['adircta1'],
+ ['adircta2'],
+ ['adircta3'],
+ ['adircta4'],
+ ['adirctb'],
+ ['adirctb1'],
+ ['adirctb2'],
+ ['adirctb3'],
+ ['adirctc'],
+ ['adirctc1'],
+ ['adirctc2'],
+ ['adirctc3'],
+ ['adirctc4'],
+ ['BLCmcL'],
+ ['BLCpC'],
+ ['BLCtC'],
+ ['BLCtE'],
+ ['ca_sex'],
+ ['DMSA'],
+ ['DMSB'],
+ ['DMSceP'],
+ ['DMSeeP'],
+ ['DMSmcLD'],
+ ['DMSmcLS'],
+ ['DMSpc0'],
+ ['DMSpc12'],
+ ['DMSpc4'],
+ ['DMSpcD'],
+ ['DMSpcS'],
+ ['DMStC'],
+ ['DMStCD'],
+ ['DMStCS'],
+ ['IEDcS'],
+ ['IEDcsE'],
+ ['IEDcsT'],
+ ['IEDedE'],
+ ['IEDpedE'],
+ ['IEDtE'],
+ ['IEDtEA'],
+ ['IEDtT'],
+ ['IEDtTA'],
+ ['PALcS'],
+ ['PALft'],
+ ['PALftS'],
+ ['PALmsE'],
+ ['PALmsT'],
+ ['PALtE'],
+ ['PALtEA'],
+ ['PALtT'],
+ ['PALtTA'],
+ ['r_detect'],
+ ['r_rt'],
+ ['r_rtsd'],
+ ['r_var'],
+ ['rn_comis'],
+ ['rn_omis'],
+ ['rp_comis'],
+ ['rp_omis'],
+ ['RTI1mT'],
+ ['RTI1rT'],
+ ['RTI5mT'],
+ ['RTI5rT'],
+ ['SOCitT'],
+ ['SOCmM'],
+ ['SOCstT'],
+ ['SRMcN'],
+ ['SRMcP'],
+ ['SRMmcL'],
+ ['SSPsL'],
+ ['SSPtE'],
+ ['SSPtuE'],
+ ['SWMtE4'],
+ ['SWMtE6'],
+ ['SWMtE8']]
 for id_features in returns_lists:
     for training_i in range(60):        
         #    for prediction_length in range(90,180,30):
@@ -445,7 +519,7 @@ for id_features in returns_lists:
                     json_dict = json.dumps(json_dict)
                     arg_list = [json_dict]
                     my_env = {'CUDA_VISIBLE_DEVICES': str(gpu_select)}
-                    command = [py_env, './run_json_transfer.py'] + arg_list
+                    command = [py_env, './run_json_transfer_featout.py'] + arg_list
     #                command = [py_env, './run_json_transfer.py'] + arg_list
                     print(command)
                     print('\n *** \n')

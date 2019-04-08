@@ -19,8 +19,8 @@ import itertools
 seq_length = 600
 no_subnets = False
 OVRLPS=False
-#experiment_top_path = './two_subnets_Model0_validate_{0}/'
-experiment_top_path = './two_subnets_Model0_comb2_new_{0}/'
+experiment_top_path = './two_subnets_Model2_{0}/'
+#experiment_top_path = './two_subnets_Model0_comb2_{0}/'
 Model=experiment_top_path.strip("./").split("_")[2]
 
 plat = platform.linux_distribution()[0]
@@ -42,11 +42,37 @@ patience = 10
 slow_test = True
 prediction_length=60
 
-combination=2
-ADOS_id=[['adircta'],['DMSpc0'],['DMSpc12'],['DMSpc4'],['DMSpcD'],['DMStC'],['IEDtT'],['IEDtT'],['IEDtTA'],['PALft'],['PALmsE'],['PALtTA'],['r_rpsty'],['r_var'],['rp_comis'],['SOCmM'],['SWMtE']]
 
-#ADOS_id=[list(i) for i in ADOS_id]
-returns=list(itertools.combinations(ADOS_id,combination))
+
+
+ADOS_ids=['BB1',	'BB2','BB3',	'BB4',	'BB5',	'BB6',	'BB7',	'BB8'	,'BB9','BB10','DMSA',	    'DMSB',	    'DMSmcLD',  'DMSmcLS',	'DMSpcD',	'DMSpcS',	'DMSpc0',	'DMSpc4',	'DMSpc12',	'DMSceP',	'DMSeeP',	'DMStC', 'DMStCD',	'DMStCS',	'DMStC0',	'DMStC4',	'DMStC12','MTSmcL',	'MTSmeL',	'MTSmlC',	'MTSpC',	'MTStnC','PRMmcL', 'PRMcN',	'PRMcP','RVPA',	    'RVPB',	    'RVPmL',	'RVPfaP',	'RVPhP',	'RVPrN',	'RVPfaN',	'RVPhN',	'RVPmN']
+ADOS_BB=[tuple(['BB1']),tuple(['BB2', 'BB3', 'BB4', 'BB5', 'BB6']),tuple(['BB7', 'BB8', 'BB9', 'BB10' ])]
+ADOS_DMS=[tuple(['DMSA']),tuple(['DMSB']),tuple(['DMSceP',	'DMSeeP']),tuple(['DMSmcLS']),tuple(['DMSmcLD']),tuple(['DMSpcS',	'DMSpc0',	'DMSpc4']),tuple(['DMStCD',	'DMStCS',	'DMStC0',	'DMStC4',	'DMStC12'])]
+ADOS_MTS=[tuple(['MTSmcL']),	tuple(['MTSmeL']),	tuple(['MTSmlC']),	tuple(['MTSpC']),	tuple(['MTStnC'])]
+ADOS_PRM=[tuple(['PRMmcL'])]
+ADOS_RVP=[tuple(['RVPA',	    'RVPB', 'RVPmN']),tuple(['RVPhP',	'RVPrN',	'RVPfaN',	'RVPhN']),tuple(['RVPfaP','RVPmL'])]
+
+# =============================================================================
+# Single good value indexs
+# =============================================================================
+
+#ADOS_BB=[tuple(['BB5',	'BB6']),tuple(['BB3']),tuple(['BB7']),tuple(['BB8']),tuple(['BB9'])]
+ADOS_DMS=[tuple(['DMSA']),tuple(['DMSB']),tuple(['DMSceP']),tuple(['DMSeeP']),tuple(['DMSpcS']),tuple(['DMStC']),tuple(['DMStCD'])]
+ADOS_MTS=[tuple(['MTSpC']),tuple(['MTStnC'])]
+ADOS_PRM=[tuple(['PRMcN']),tuple(['PRMmcL'])]
+ADOS_RVP=[tuple(['RVPfaP'])]
+#ADOS_A=[tuple(['AA4']),tuple(['AA5']),tuple(['AA7']),tuple(['AA9'])]
+ADOS_ADIR=[tuple(['adircta']),tuple(['adirctb','adirctb1','adirctb2','adirctb3']),tuple(['adirctc','adirctc1','adirctc2','adirctc3','adirctc4'])]
+ADOS_IED=[tuple(['IEDpedE']),tuple(['IEDtT']),tuple(['IEDtTA'])]
+ADOS_PAL=[tuple(['PALft']),tuple(['PALmsE'])]
+ADOS_OTHER=[tuple(['r_detect']),tuple(['r_rtsd']),tuple(['r_var']),tuple(['rn_comis']),tuple(['rn_omis']),tuple(['rp_comis'])]
+ADOS_SOC=[tuple(['SOCstT'])]
+ADOS_SRM=[tuple(['SRMcN']),tuple(['SRMcP'])]
+ADOS_SSP=[tuple(['SSPtuE'])]
+ADOS_SWM=[tuple(['SWMtE6']),tuple(['SWMtE8'])]
+
+#Comb 1 session
+returns=list(itertools.product(ADOS_DMS,ADOS_MTS,ADOS_PRM,ADOS_RVP,ADOS_ADIR,ADOS_IED,ADOS_PAL,ADOS_OTHER,ADOS_SOC,ADOS_SRM,ADOS_SSP,ADOS_SWM,repeat=1))
 returns_lists=[]
 for i in returns:
     lst=[]
@@ -54,19 +80,159 @@ for i in returns:
         lst+=list(q)
     returns_lists.append(lst)
 
-#Delete the tried sequence
-#for ret_lst in returns_lists:    
-#    if ret_lst in exclude_lists:
-#        returns_lists.remove(ret_lst)
+#Comb 2 session
+#ADOS_id=ADOS_BB+ADOS_DMS+ADOS_MTS+ADOS_PRM+ADOS_RVP
+#ADOS_id=[list(i) for i in ADOS_id]
+#returns=list(itertools.combinations(ADOS_id,2))
+#returns_lists=[]
+#for i in returns:
+#    lst=[]
+#    for q in i:
+#        lst+=list(q)
+#    returns_lists.append(lst)
 
+#for training_i in range(3,5,1):
+returns_lists=returns_lists=[
+ ['SRMcN'],
+ ['adirctc'],
+ ['PRMcP'],
+ ['DMStC', 'DMStC4'],
+ ['IEDcsE'],
+ ['MTStnC'],
+ ['PRMcN'],
+ ['IEDtT'],
+ ['IEDtT', 'IEDtTA'],
+ ['DMSpcD'],
+ ['rn_omis'],
+ ['DMSA', 'PALmsE'],
+ ['DMSceP', 'r_var'],
+ ['PRMcN', 'rn_omis'],
+ ['DMSB', 'MTSpC'],
+ ['DMSeeP', 'r_var'],
+ ['DMSB', 'IEDtT'],
+ ['PRMcN', 'DMStCD'],
+ ['DMStCD', 'PALft'],
+ ['DMSA', 'rp_comis'],
+ ['PRMcN', 'DMSB'],
+ ['DMSceP', 'r_rtsd'],
+ ['DMSceP', 'r_detect'],
+ ['adircta', 'PALft'],
+ ['IEDpedE', 'MTSpC'],
+ ['rp_comis', 'r_var'],
+ ['DMSeeP', 'rp_comis'],
+ ['PALmsE', 'IEDtTA'],
+ ['IEDtTA', 'r_detect'],
+ ['DMSeeP', 'DMStC'],
+ ['rn_omis', 'rp_comis'],
+ ['DMSeeP', 'r_rtsd'],
+ ['r_rtsd', 'r_var'],
+ ['MTSpC', 'r_var'],
+ ['DMSceP', 'IEDtT'],
+ ['adircta', 'r_var'],
+ ['PALft', 'r_var'],
+ ['adirctc1', 'adirctc2', 'adirctc3', 'adirctc4', 'IEDtT'],
+ ['SRMcP', 'PALftS'],
+ ['rn_omis', 'rn_comis'],
+ ['SRMcP', 'PALmsE'],
+ ['PRMcN', 'MTSpC'],
+ ['PALft', 'IEDpedE'],
+ ['SRMcN', 'DMSA'],
+ ['PRMcN', 'DMSA'],
+ ['IEDtT', 'r_rtsd'],
+ ['adircta', 'IEDtTA'],
+ ['DMSA', 'DMSB', 'rn_omis'],
+ ['DMSA', 'RVPfaP', 'r_var'],
+ ['adirctc4', 'DMSA'],
+ ['adirctc2', 'rn_omis'],
+ ['adirctc4', 'IEDtT', 'rn_omis'],
+ ['DMSB', 'PALft', 'IEDpedE'],
+ ['SRMcN', 'DMSA', 'PALftS'],
+ ['DMSB', 'DMStCD', 'r_detect'],
+ ['adirctc3', 'adirctc4', 'DMSA'],
+ ['DMSceP', 'IEDtT', 'rn_omis'],
+ ['DMSA', 'DMSceP', 'rn_omis'],
+ ['adirctc1', 'DMSA', 'rn_omis'],
+ ['MTStnC'],
+ ['DMSB', 'PALft', 'r_detect'],
+ ['DMSA', 'DMStC', 'IEDtTA'],
+ ['SRMcN', 'DMSA', 'SSPtuE'],
+ ['adirctc2', 'PRMcN', 'DMSA'],
+ ['adirctc2', 'adirctc3', 'rn_omis'],
+ ['adirctc3', 'IEDtT'],
+ ['adirctc', 'DMSB', 'rn_omis'],
+ ['DMSB', 'PALft', 'PALmsE'],
+ ['DMSA', 'DMSeeP', 'IEDtT'],
+ ['adircta', 'DMSA', 'DMSpcS'],
+ ['DMSA', 'DMSceP', 'PALft'],
+ ['DMSA', 'PALmsE', 'MTStnC'],
+ ['DMSA', 'DMSceP', 'r_var'],
+ ['DMSA', 'DMSeeP', 'IEDpedE'],
+ ['adirctc1', 'DMSceP', 'rn_omis'],
+ ['DMSA', 'DMSB', 'DMStCD'],
+ ['DMSA', 'SSPtuE', 'rp_comis'],
+ ['DMSA', 'MTStnC', 'rn_omis'],
+ ['SRMcP', 'DMSB', 'MTSpC'],
+ ['DMSB', 'RVPfaP', 'r_rtsd'],
+ ['DMSA', 'rn_omis', 'r_var'],
+ ['DMSB', 'IEDtTA', 'r_rtsd'],
+ ['adirctc3', 'PRMcN', 'DMSA'],
+ ['DMSB', 'IEDpedE', 'rn_comis'],
+ ['adirctc1', 'adirctc3', 'DMSB', 'rn_omis'],
+ ['adirctc1', 'adirctc4', 'DMSA', 'IEDtT'],
+ ['adircta', 'DMSA', 'DMSB', 'rn_comis'],
+ ['adirctc1', 'adirctc2', 'adirctc3', 'adirctc4', 'DMSA', 'DMSceP', 'DMStCD'],
+ ['DMSA', 'DMSceP', 'DMSeeP', 'r_var'],
+ ['DMSA', 'DMSB', 'rn_omis', 'rn_comis'],
+ ['DMSA', 'DMSceP', 'DMStCS', 'SWMtE6'],
+ ['adirctc3', 'adirctc4', 'PRMcN', 'DMSA'],
+ ['DMSA', 'DMSB', 'IEDtT', 'r_var'],
+ ['DMSA', 'DMSB', 'MTSpC', 'rn_omis'],
+ ['adirctc3', 'PRMcN', 'DMSB', 'DMSceP'],
+ ['adirctc4', 'PRMcN', 'DMSB', 'IEDtT'],
+ ['adirctc1', 'adirctc2', 'adirctc4', 'IEDtT'],
+ ['SRMcN', 'DMSA', 'DMSB', 'DMSeeP'],
+ ['adirctc4', 'DMSceP', 'rn_omis'],
+ ['adirctc1', 'adirctc2', 'DMSceP', 'rn_omis'],
+ ['DMSA', 'DMSpcS', 'DMSceP', 'PALmsE'],
+ ['adirctc1', 'adirctc2', 'adirctc3', 'adirctc4', 'DMSA', 'DMSB', 'DMSceP'],
+ ['DMSA', 'DMSB', 'DMSpcS', 'DMSeeP'],
+ ['adirctc', 'PRMcN', 'DMSceP', 'rn_omis'],
+ ['adirctc1', 'DMSB', 'DMSceP', 'rn_omis'],
+ ['adirctb1', 'adirctb2', 'adirctb3', 'DMSA', 'DMSceP', 'MTSpC'],
+ ['adirctc1', 'adirctc2', 'adirctc3', 'adirctc4', 'DMSA', 'DMSB', 'r_rtsd'],
+ ['adirctc1', 'adirctc2', 'adirctc3', 'adirctc4', 'DMSA', 'DMSB', 'rn_omis'],
+ ['SRMcN', 'DMSA', 'DMSB', 'PALmsE'],
+ ['adirctc3', 'DMSA', 'DMSB', 'DMSceP'],
+ ['adirctc3', 'adirctc4', 'DMSceP', 'rn_omis'],
+ ['adirctc2', 'adirctc3', 'adirctc4', 'IEDtT'],
+ ['adirctc1', 'adirctc2', 'adirctc4', 'IEDtT'],
+ ['adirctc1', 'adirctc3', 'adirctc4', 'DMSA', 'IEDtT'],
+ ['adirctc1', 'adirctc2', 'adirctc3', 'PRMcN', 'rn_omis'],
+ ['DMSA', 'DMSB', 'DMSeeP', 'rn_omis', 'rn_comis'],
+ ['DMSA', 'DMSB', 'DMSeeP', 'DMStC', 'r_var'],
+ ['adirctc3', 'adirctc4', 'DMSB', 'rn_omis'],
+ ['adirctc2', 'adirctc3', 'adirctc4', 'DMSB', 'rn_omis'],
+ ['adirctc1', 'DMSA', 'DMSB', 'IEDtT'],
+ ['adirctc1',
+  'adirctc2',
+  'adirctc3',
+  'adirctc4',
+  'DMSA',
+  'DMSB',
+  'DMSceP',
+  'rn_omis'],
+ ['DMSA', 'DMSB', 'DMSceP', 'PALft', 'r_var'],
+ ['adirctc1', 'adirctc3', 'DMSB', 'IEDtT'],
+ ['adircta', 'PRMcN', 'DMSA', 'DMSB', 'DMSceP'],
+ ['SRMcN', 'DMSA', 'DMSB', 'DMSeeP', 'MTSpC']]
 
 for id_features in returns_lists:
-    for training_i in range(5):        
+    for training_i in range(52):        
         #    for prediction_length in range(90,180,30):
     #    train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
     #    test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
-        train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
-        test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
+        train_list_path = './data/splits/training_{0}.txt'.format(training_i)
+        test_list_path = './data/splits/testing_{0}.txt'.format(training_i)
         # train_list_path = './data/splits/training_dev_small.txt'
         # test_list_path = './data/splits/testing_dev_small.txt'
         
@@ -412,7 +578,7 @@ for id_features in returns_lists:
                     json_dict = json.dumps(json_dict)
                     arg_list = [json_dict]
                     my_env = {'CUDA_VISIBLE_DEVICES': str(gpu_select)}
-                    command = [py_env, './run_json_transfer.py'] + arg_list
+                    command = [py_env, './run_json_transfer_featout_M2.py'] + arg_list
     #                command = [py_env, './run_json_transfer.py'] + arg_list
                     print(command)
                     print('\n *** \n')
@@ -484,22 +650,6 @@ for id_features in returns_lists:
                            }
         
             json.dump(report_dict, open(trial_path + '/report_dict.json', 'w'), indent=4, sort_keys=True)
-
-
-# create folder within loop number
-
-# %% run multiprocessing
-
-#param_list = []
-#for experiment_name, experiment_features_list, experiment_settings in zip(experiment_name_list,
-#                                                                          experiment_features_lists,
-#                                                                          experiment_settings_list):
-#    param_list.append([experiment_name, experiment_features_list, experiment_settings])
-#
-## if __name__=='__main__':
-##    p = multiprocessing.Pool(num_workers)
-##    p.map(run_trial,param_list)   
-#for params in param_list:
-#    run_trial(params)
-
-
+            name=experiment_name.replace("1+3_ADOS_","")
+subprocess.run('python ./feature_save/Aggregate_pkl.py {0}'.format(name),shell=True)
+subprocess.run('rm /home/jack/lstm_turn_taking_prediction_ADOS/feature_save/*.pkl',shell=True)

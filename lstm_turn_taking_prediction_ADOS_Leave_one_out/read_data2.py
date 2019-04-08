@@ -28,7 +28,7 @@ predict_length=60
 #mode='no_subnets_transfer_{0}'
 #mode='two_subnets_Model0_validate_local_{0}_{1}'
 #mode='two_subnets_Model0_validate_{0}_{1}'
-mode='two_subnets_Model0_{0}_{1}'
+mode='two_subnets_Model2_{0}_{1}'
 #mode='two_subnets_Model0_comb2_{0}_{1}'
 
 

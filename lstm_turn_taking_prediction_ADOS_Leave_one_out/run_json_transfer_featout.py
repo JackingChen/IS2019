@@ -56,7 +56,8 @@ alpha = 0.99  # smoothing constant
 init_std = 0.5
 momentum = 0
 test_batch_size = 1  # this should stay fixed at 1 when using slow test because the batches are already set in the data loader
-OVERLAPS=False
+OVERLAPS=True
+
 # sequence_length = 800
 # dropout = 0
 prediction_length = 60  # (3 seconds of prediction)
@@ -65,7 +66,8 @@ num_layers = 1
 onset_test_flag = True
 annotations_dir = './data/extracted_annotations/voice_activity/'
 
-#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50", "visual_as_id": false}, {"folder_path": "./data/extracted_Identities/", "features": ["DMSceP", "DMSeeP"], "modality": "visual", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "wrd_reg", "title_string": "_id", "use_glove": false, "glove_embed_table": "", "visual_as_id": true}], "results_dir": "./two_subnets_Model0_4_60/1+3_ADOS_DMScePDMSeeP/test/", "name_append": "1_1+3_ADOS_DMScePDMSeeP_m_60_a_60_v_4_lr_01_l2e_0_l2o_-07_l2m_-05_l2a__l2v__dmo_5_dmi_25_dao__dai__dvo_0_dvi__seq_600", "no_subnets": false, "hidden_nodes_master": 60, "hidden_nodes_acous": 60, "hidden_nodes_visual": 4, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_4.txt", "test_list_path": "./data/splits/testing_4.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-07, "master": 1e-05, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0.25, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}, "prediction_length": 60}']
+Training_loss_range=0.005
+#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50", "visual_as_id": false}, {"folder_path": "./data/extracted_Identities/", "features": ["PRMcN", "DMStCD"], "modality": "visual", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "wrd_reg", "title_string": "_id", "use_glove": false, "glove_embed_table": "", "visual_as_id": true}], "results_dir": "./two_subnets_Model0_37_60/1+3_ADOS_PRMcNDMStCD/test/", "name_append": "1_1+3_ADOS_PRMcNDMStCD_m_60_a_60_v_4_lr_01_l2e_0_l2o_-07_l2m_-05_l2a__l2v__dmo_5_dmi_25_dao__dai__dvo_0_dvi__seq_600", "no_subnets": false, "hidden_nodes_master": 60, "hidden_nodes_acous": 60, "hidden_nodes_visual": 4, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_37.txt", "test_list_path": "./data/splits/testing_37.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-07, "master": 1e-05, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0.25, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}, "prediction_length": 60}']
 
 proper_num_args = 2
 print('Number of arguments is: ' + str(len(argv)))
@@ -1054,11 +1056,26 @@ for epoch in range(0, num_epochs):
             print('majority vote f-score:' + str(
                 f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
             results_save['f_scores_' + overlap_str].append(f_score)
+            if (len(set(true_vals_overlap))>=2):
+                tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
+            elif  (len(set(true_vals_overlap))==1):
+                if true_vals_overlap == predicted_class_overlap:
+                    if true_vals_overlap[0]==0:
+                        tn, fp, fn, tp = 0,0,1,0
+                    elif true_vals_overlap[0]==1:
+                        tn, fp, fn, tp = 0,0,0,1
+                else:
+                    if true_vals_overlap[0]==0:
+                        tn, fp, fn, tp = 0,1,0,0
+                    elif true_vals_overlap[0]==1:
+                        tn, fp, fn, tp = 1,0,0,0
+            else:
+                tn,fp,fn,tp, = 0,0,0,0
             #tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
-            #results_save['tn_' + overlap_str].append(tn)
-            #results_save['fp_' + overlap_str].append(fp)
-            #results_save['fn_' + overlap_str].append(fn)
-            #results_save['tp_' + overlap_str].append(tp)
+            results_save['tn_' + overlap_str].append(tn)
+            results_save['fp_' + overlap_str].append(fp)
+            results_save['fn_' + overlap_str].append(fn)
+            results_save['tp_' + overlap_str].append(tp)
     # get error per person
     bar_chart_labels = []
     bar_chart_vals = []
@@ -1090,8 +1107,10 @@ for epoch in range(0, num_epochs):
             np.round(t_epoch_end - t_epoch_strt, 2),
             np.round(t_total_end - t_epoch_end, 2),
             np.round(t_total_end - t_epoch_strt, 2)))
+#    if (epoch + 1 > patience) and \
+#            (np.argmin(np.round(results_save['test_losses'], 4)) < (len(results_save['test_losses']) - patience)):
     if (epoch + 1 > patience) and \
-            (np.argmin(np.round(results_save['test_losses'], 4)) < (len(results_save['test_losses']) - patience)):
+            (np.std(np.round(results_save['train_losses'][-patience:], 4))<Training_loss_range):
         print('early stopping called at epoch: ' + str(epoch + 1))
         
         

@@ -24,7 +24,7 @@ word_embed_out_dim_glove = 300
 seq_length = 600
 no_subnets = True
 
-experiment_top_path = './no_subnets_transfer_{0}/'
+experiment_top_path = './no_subnets_transfer_10fold_{0}/'
 #experiment_top_path = './no_subnets_{0}/'
 plat = platform.linux_distribution()[0]
 #plat = 'not_arch'
@@ -50,9 +50,9 @@ OVRLPS=None
 
 #LOO_list=list(set(list(range(60)))-set([4,8,13,37,43,50]))
 
-for training_i in range(5):
-    train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
-    test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
+for training_i in range(10):
+    train_list_path = './data/splits10/training_{0}.txt'.format(training_i%10)
+    test_list_path = './data/splits10/testing_{0}.txt'.format(training_i%10)
 #    train_list_path = './data/splits/training.txt'
 #    test_list_path = './data/splits/testing.txt'
     # train_list_path = './data/splits/training_dev_small.txt'

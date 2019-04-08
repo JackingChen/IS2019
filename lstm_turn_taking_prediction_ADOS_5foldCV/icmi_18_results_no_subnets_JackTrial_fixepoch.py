@@ -24,7 +24,7 @@ word_embed_out_dim_glove = 300
 seq_length = 600
 no_subnets = True
 
-experiment_top_path = './no_subnets_transfer_{0}/'
+experiment_top_path = './no_subnets_transfer_fixepoch80_2ndround_{0}/'
 #experiment_top_path = './no_subnets_{0}/'
 plat = platform.linux_distribution()[0]
 #plat = 'not_arch'
@@ -50,7 +50,7 @@ OVRLPS=None
 
 #LOO_list=list(set(list(range(60)))-set([4,8,13,37,43,50]))
 
-for training_i in range(5):
+for training_i in range(3,5):
     train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
     test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
 #    train_list_path = './data/splits/training.txt'
@@ -258,7 +258,7 @@ for training_i in range(5):
     #%% Experiments list
     
     gpu_select = 0
-    test_indices = [0,1,2,3,4]
+    test_indices = range(5,20,1)
     
     experiment_name_list = [
         '1_Acous_50ms_baseline',
@@ -440,7 +440,7 @@ for training_i in range(5):
                 arg_list = [json_dict]
         #            cuda_var = randint(0,cuda_int)
                 my_env = {'CUDA_VISIBLE_DEVICES':str(gpu_select)}
-                command = [py_env, './run_json_transfer_Jack_Trial.py'] + arg_list 
+                command = [py_env, './run_json_transfer_Jack_Trial_fixepoch.py'] + arg_list 
                 print(command)
                 print(test_path+name_append_test)
                 print('\n *** \n')

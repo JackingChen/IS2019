@@ -58,10 +58,10 @@ momentum = 0
 test_batch_size = 1  # this should stay fixed at 1 when using slow test because the batches are already set in the data loader
 prediction_length=60
 Train_loss_range=0.005
-
+FIXEPOCH=80
 # sequence_length = 800
 # dropout = 0
-
+OVERLAPS=True
 shuffle = True
 num_layers = 1
 onset_test_flag = True
@@ -336,10 +336,16 @@ loss_func_BCE_Logit = nn.BCEWithLogitsLoss()
 
 # %% Test function
 def test():
+    model.eval()
     losses_test = list()
     results_dict = dict()
     losses_dict = dict()
     batch_sizes = list()
+    batch_sizes_d = list()
+    batch_sizes_k = list()
+    BCElosses_test = list()
+    BCElosses_test_d = list()
+    BCElosses_test_k = list()
     losses_mse, losses_l1 = [], []
     model.eval()
     # setup results_dict
@@ -351,10 +357,11 @@ def test():
             results_dict[file_name + '/' + g_f] = np.zeros([results_lengths[file_name], prediction_length])
             losses_dict[file_name + '/' + g_f] = np.zeros([results_lengths[file_name], prediction_length])
 
-    for batch_indx, batch in enumerate(test_dataloader):
-
+    
+    
+    for batch_indx, batch in enumerate(test_dataloader):            
         model_input = []
-
+    
         for b_i, bat in enumerate(batch):
             if len(bat) == 0:
                 model_input.append(bat)
@@ -362,23 +369,21 @@ def test():
                 model_input.append(torch.squeeze(bat, 0).transpose(0, 2).transpose(1, 2).numpy())
             elif (b_i == 0) or (b_i == 2):
                 model_input.append(Variable(torch.squeeze(bat, 0).type(dtype)).transpose(0, 2).transpose(1, 2))
-
+    
         y_test = Variable(torch.squeeze(batch[4].type(dtype), 0))
-
+    
         info_test = batch[-1]
         batch_length = int(info_test['batch_size'])
         if batch_indx == 0:
             model.change_batch_size_reset_states(batch_length)
         else:
-            if slow_test:
-                model.change_batch_size_no_reset(batch_length)
-            else:
-                model.change_batch_size_reset_states(batch_length)
 
+            model.change_batch_size_reset_states(batch_length)
+    
         out_test = model(model_input)
         out_test = torch.transpose(out_test, 0, 1)
-
-
+        
+    
         
         if test_dataset.set_type == 'test':
             file_name_list = [info_test['file_names'][i][0] for i in range(len(info_test['file_names']))]
@@ -388,47 +393,72 @@ def test():
             file_name_list = info_test['file_names']
             gf_name_list = info_test['g_f']
             time_index_list = info_test['time_indices']
-
+        
+        
+        gf_test = [item for sublist in info_test['g_f'] for item in sublist]
+        d_idx=np.where(np.array(gf_test)=='d')[0]
+        k_idx=np.where(np.array(gf_test)=='k')[0]
         # Should be able to make other loss calculations faster
         # Too many calls to transpose as well. Should clean up loss pipeline
         y_test = y_test.permute(2, 0, 1)
         loss_no_reduce = loss_func_L1_no_reduce(out_test, y_test.transpose(0, 1))
-
+    
         for file_name, g_f_indx, time_indices, batch_indx in zip(file_name_list,
                                                                  gf_name_list,
                                                                  time_index_list,
                                                                  range(batch_length)):
-
+    
             results_dict[file_name + '/' + g_f_indx][time_indices[0]:time_indices[1]] = out_test[
                 batch_indx].data.cpu().numpy()
             losses_dict[file_name + '/' + g_f_indx][time_indices[0]:time_indices[1]] = loss_no_reduce[
                 batch_indx].data.cpu().numpy()
+    
+    #        loss = loss_func_BCE(F.sigmoid(out_test), y_test.transpose(0, 1))
+        BCE_Logit_loss = loss_func_BCE_Logit(out_test,y_test.transpose(0,1))
+        BCE_Logit_loss_d = loss_func_BCE_Logit(out_test[d_idx,:,:],y_test.transpose(0,1)[d_idx,:,:])
+        BCE_Logit_loss_k = loss_func_BCE_Logit(out_test[k_idx,:,:],y_test.transpose(0,1)[k_idx,:,:])
         
-        loss = loss_func_BCE(F.sigmoid(out_test), y_test.transpose(0, 1))
-#        loss = loss_func_BCE_Logit(out_test,y_test.transpose(0,1))
+        loss = loss_func_BCE_Logit(out_test,y_test.transpose(0,1))
         losses_test.append(loss.data.cpu().numpy())
         batch_sizes.append(batch_length)
-
+        batch_sizes_d.append(len(d_idx))
+        batch_sizes_k.append(len(k_idx))
+        
+        
+        BCElosses_test.append(BCE_Logit_loss.data.cpu().numpy())
+        BCElosses_test_d.append(BCE_Logit_loss_d.data.cpu().numpy())
+        BCElosses_test_k.append(BCE_Logit_loss_k.data.cpu().numpy())
         loss_l1 = loss_func_L1(out_test, y_test.transpose(0, 1))
         losses_l1.append(loss_l1.data.cpu().numpy())
+        
 
+    
+    
     # get weighted mean
     loss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_test))) / np.sum(batch_sizes)
     loss_weighted_mean_l1 = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_l1))) / np.sum(batch_sizes)
+    BCEloss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(BCElosses_test))) / np.sum(batch_sizes)
+    BCEloss_weighted_mean_d = np.sum(np.array(batch_sizes_d) * np.squeeze(np.array(BCElosses_test_d))) / np.sum(batch_sizes_d)
+    BCEloss_weighted_mean_k = np.sum(np.array(batch_sizes_k) * np.squeeze(np.array(BCElosses_test_k))) / np.sum(batch_sizes_k)
     #    loss_weighted_mean_mse = np.sum( np.array(batch_sizes)*np.squeeze(np.array(losses_mse))) / np.sum( batch_sizes )
-
+    
     for conv_key in test_file_list:
-
+    
         results_dict[conv_key + '/' + data_select_dict[data_set_select][1]] = np.array(
             results_dict[conv_key + '/' + data_select_dict[data_set_select][1]]).reshape(-1, prediction_length)
         results_dict[conv_key + '/' + data_select_dict[data_set_select][0]] = np.array(
             results_dict[conv_key + '/' + data_select_dict[data_set_select][0]]).reshape(-1, prediction_length)
-
+    
     # get hold-shift f-scores 
     for pause_str in pause_str_list:
         true_vals = list()
+        true_vals_k = list()
+        true_vals_d = list()
         predicted_class = list()
+        predicted_class_kid = list()
+        predicted_class_doc = list()
         for conv_key in test_file_list:
+            #Get both turntaking of doc and kid
             for g_f_key in list(hold_shift[pause_str + '/hold_shift' + '/' + conv_key].keys()):
                 g_f_key_not = deepcopy(data_select_dict[data_set_select])
                 g_f_key_not.remove(g_f_key)
@@ -436,21 +466,95 @@ def test():
                     # make sure the index is not out of bounds
                     if frame_indx < len(results_dict[conv_key + '/' + g_f_key]):
                         true_vals.append(true_val)
+                        if g_f_key=='k':
+                                true_vals_k.append(true_val)
+                        elif g_f_key=='d':
+                                true_vals_d.append(true_val)
                         if np.sum(
                                 results_dict[conv_key + '/' + g_f_key][frame_indx, 0:length_of_future_window]) > np.sum(
                                 results_dict[conv_key + '/' + g_f_key_not[0]][frame_indx, 0:length_of_future_window]):
                             predicted_class.append(0)
+                            #Get only turntaking of kid
+                            if g_f_key=='k':
+                                predicted_class_kid.append(0)
+                            elif g_f_key=='d':
+                                predicted_class_doc.append(0)
                         else:
                             predicted_class.append(1)
+                            #Get only turntaking of kid
+                            if g_f_key=='k':
+                                predicted_class_kid.append(1)
+                            elif g_f_key=='d':
+                                predicted_class_doc.append(1)
+    
         f_score = f1_score(true_vals, predicted_class, average='weighted')
         results_save['f_scores_' + pause_str].append(f_score)
-        tn, fp, fn, tp = confusion_matrix(true_vals, predicted_class).ravel()
+        if (len(set(true_vals))>=2):
+            tn, fp, fn, tp = confusion_matrix(true_vals, predicted_class).ravel()
+        elif  (len(set(true_vals))==1):
+            if true_vals == predicted_class:
+                if true_vals[0]==0:
+                    tn, fp, fn, tp = 0,0,1,0
+                elif true_vals[0]==1:
+                    tn, fp, fn, tp = 0,0,0,1
+            else:
+                if true_vals[0]==0:
+                    tn, fp, fn, tp = 0,1,0,0
+                elif true_vals[0]==1:
+                    tn, fp, fn, tp = 1,0,0,0
+        else:
+            tn, fp, fn, tp = 0,0,0,0
+    
+        
+        if (len(set(true_vals_k))>=2):
+            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k, predicted_class_kid).ravel()
+        elif  (len(set(true_vals_k))==1):
+            if true_vals_k == predicted_class_kid:
+                if true_vals_k[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,1,0
+                elif true_vals_k[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,0,1
+            else:
+                if true_vals_k[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,1,0,0
+                elif true_vals_k[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 1,0,0,0
+        else:
+            tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+        
+        if (len(set(true_vals_d))>=2):
+            tn_d, fp_d, fn_d, tp_d = confusion_matrix(true_vals_d, predicted_class_doc).ravel()
+        elif  (len(set(true_vals_d))==1):
+            if true_vals_d == predicted_class_doc:
+                if true_vals_d[0]==0:
+                    tn_d, fp_d, fn_d, tp_d = 0,0,1,0
+                elif true_vals_d[0]==1:
+                    tn_d, fp_d, fn_d, tp_d = 0,0,0,1
+            else:
+                if true_vals_d[0]==0:
+                    tn_d, fp_d, fn_d, tp_d = 0,1,0,0
+                elif true_vals_d[0]==1:
+                    tn_d, fp_d, fn_d, tp_d = 1,0,0,0
+        else:
+            tn_d, fp_d, fn_d, tp_d = 0,0,0,0
+        
         results_save['tn_' + pause_str].append(tn)
         results_save['fp_' + pause_str].append(fp)
         results_save['fn_' + pause_str].append(fn)
         results_save['tp_' + pause_str].append(tp)
+        
+        results_save['tn_k_' + pause_str].append(tn_k)
+        results_save['fp_k_' + pause_str].append(fp_k)
+        results_save['fn_k_' + pause_str].append(fn_k)
+        results_save['tp_k_' + pause_str].append(tp_k)
+        
+        results_save['tn_d_' + pause_str].append(tn_d)
+        results_save['fp_d_' + pause_str].append(fp_d)
+        results_save['fn_d_' + pause_str].append(fn_d)
+        results_save['tp_d_' + pause_str].append(tp_d)
         print('majority vote f-score(' + pause_str + '):' + str(
             f1_score(true_vals, np.zeros([len(predicted_class)]).tolist(), average='weighted')))
+    
     # get prediction at onset f-scores 
     # first get best threshold from training data
     if onset_test_flag:
@@ -477,7 +581,8 @@ def test():
         onset_thresh = thresholds[thresh_indx]
         onset_threshs.append(onset_thresh)
 
-        true_vals_onset, onset_test_mean_vals, predicted_class_onset = [], [], []
+        true_vals_onset, onset_test_mean_vals, predicted_class_onset, true_vals_k_onset, true_vals_d_onset,  predicted_class_kid_onset, onset_test_mean_vals_k,onset_test_mean_vals_d= [], [], [], [], [], [], [], []
+        predicted_class_kid_onset, predicted_class_doc_onset=[], []
         for conv_key in list(set(test_file_list).intersection(onsets['short_long'].keys())):
             for g_f_key in list(onsets['short_long' + '/' + conv_key].keys()):
                 #                g_f_key_not = ['g','f']
@@ -488,57 +593,202 @@ def test():
                     if (frame_indx < len(results_dict[conv_key + '/' + g_f_key])) and not (
                     np.isnan(np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :]))):
                         true_vals_onset.append(true_val)
+                        
                         onset_mean = np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :])
                         onset_test_mean_vals.append(onset_mean)
                         if onset_mean > onset_thresh:
                             predicted_class_onset.append(1)  # long
                         else:
                             predicted_class_onset.append(0)  # short
+                        
+                        if g_f_key == 'k':
+                            true_vals_k_onset.append(true_val)
+                            onset_mean = np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :])
+                            onset_test_mean_vals_k.append(onset_mean)
+                            if onset_mean > onset_thresh:
+                                predicted_class_kid_onset.append(1)  # long
+                            else:
+                                predicted_class_kid_onset.append(0)  # short
+                        elif g_f_key == 'd':
+                            true_vals_d_onset.append(true_val)
+                            onset_mean = np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :])
+                            onset_test_mean_vals_d.append(onset_mean)
+                            if onset_mean > onset_thresh:
+                                predicted_class_doc_onset.append(1)  # long
+                            else:
+                                predicted_class_doc_onset.append(0)  # short
+                        
         f_score = f1_score(true_vals_onset, predicted_class_onset, average='weighted')
+        
         print(onset_str_list[0] + ' f-score: ' + str(f_score))
         print('majority vote f-score:' + str(
             f1_score(true_vals_onset, np.zeros([len(true_vals_onset), ]).tolist(), average='weighted')))
         results_save['f_scores_' + onset_str_list[0]].append(f_score)
-        if not(len(true_vals_onset) == 0):
+        
+        if (len(set(true_vals_onset))>=2):
             tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
+        elif  (len(set(true_vals_onset))==1):
+            if true_vals_onset == predicted_class_onset:
+                if true_vals_onset[0]==0:
+                    tn, fp, fn, tp = 0,0,1,0
+                elif true_vals_onset[0]==1:
+                    tn, fp, fn, tp = 0,0,0,1
+            else:
+                if true_vals_onset[0]==0:
+                    tn, fp, fn, tp = 0,1,0,0
+                elif true_vals_onset[0]==1:
+                    tn, fp, fn, tp = 1,0,0,0
         else:
             tn,fp,fn,tp, = 0,0,0,0
+        
+        if (len(set(true_vals_k_onset))>=2):
+            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k_onset, predicted_class_kid_onset).ravel()
+        elif  (len(set(true_vals_k_onset))==1):
+            if predicted_class_kid_onset == true_vals_k_onset:
+                if true_vals_k_onset[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,1,0
+                elif true_vals_k_onset[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,0,1
+            else:
+                if true_vals_k_onset[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,1,0,0
+                elif true_vals_k_onset[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 1,0,0,0
+        else:
+            tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+        
+        if (len(set(true_vals_d_onset))>=2):
+            tn_d, fp_d, fn_d, tp_d = confusion_matrix(true_vals_d_onset, predicted_class_doc_onset).ravel()
+        elif  (len(set(true_vals_d_onset))==1):
+            if predicted_class_doc_onset == true_vals_d_onset:
+                if true_vals_d_onset[0]==0:
+                    tn_d, fp_d, fn_d, tp_d = 0,0,1,0
+                elif true_vals_d_onset[0]==1:
+                    tn_d, fp_d, fn_d, tp_d = 0,0,0,1
+            else:
+                if true_vals_d_onset[0]==0:
+                    tn_d, fp_d, fn_d, tp_d = 0,1,0,0
+                elif true_vals_d_onset[0]==1:
+                    tn_d, fp_d, fn_d, tp_d = 1,0,0,0
+        else:
+            tn_d, fp_d, fn_d, tp_d = 0,0,0,0
+
+#        if not(len(true_vals_onset) == 0):
+#            tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
+#        else:
+#            tn,fp,fn,tp, = 0,0,0,0
         results_save['tn_' + onset_str_list[0]].append(tn)
         results_save['fp_' + onset_str_list[0]].append(fp)
         results_save['fn_' + onset_str_list[0]].append(fn)
         results_save['tp_' + onset_str_list[0]].append(tp)
-
+        
+        results_save['tn_k_' + onset_str_list[0]].append(tn_k)
+        results_save['fp_k_' + onset_str_list[0]].append(fp_k)
+        results_save['fn_k_' + onset_str_list[0]].append(fn_k)
+        results_save['tp_k_' + onset_str_list[0]].append(tp_k)
+        
+        results_save['tn_d_' + onset_str_list[0]].append(tn_d)
+        results_save['fp_d_' + onset_str_list[0]].append(fp_d)
+        results_save['fn_d_' + onset_str_list[0]].append(fn_d)
+        results_save['tp_d_' + onset_str_list[0]].append(tp_d)
     # get prediction at overlap f-scores
-
-    for overlap_str in overlap_str_list:
-        true_vals_overlap, predicted_class_overlap = [], []
-
-        for conv_key in list(set(list(overlaps[overlap_str].keys())).intersection(set(test_file_list))):
-            for g_f_key in list(overlaps[overlap_str + '/' + conv_key].keys()):
-                g_f_key_not = deepcopy(data_select_dict[data_set_select])
-                g_f_key_not.remove(g_f_key)
-                for eval_indx, true_val in overlaps[overlap_str + '/' + conv_key + '/' + g_f_key]:
-                    # make sure the index is not out of bounds
-                    if eval_indx < len(results_dict[conv_key + '/' + g_f_key]):
-                        true_vals_overlap.append(true_val)
-                        if np.sum(results_dict[conv_key + '/' + g_f_key][eval_indx,
-                                  eval_window_start_point: eval_window_start_point + eval_window_length]) \
-                                > np.sum(results_dict[conv_key + '/' + g_f_key_not[0]][eval_indx,
-                                         eval_window_start_point: eval_window_start_point + eval_window_length]):
-                            predicted_class_overlap.append(0)
-                        else:
-                            predicted_class_overlap.append(1)
-        f_score = f1_score(true_vals_overlap, predicted_class_overlap, average='weighted')
-        print(overlap_str + ' f-score: ' + str(f_score))
-
-        print('majority vote f-score:' + str(
-            f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
-        results_save['f_scores_' + overlap_str].append(f_score)
-        tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
-        results_save['tn_' + overlap_str].append(tn)
-        results_save['fp_' + overlap_str].append(fp)
-        results_save['fn_' + overlap_str].append(fn)
-        results_save['tp_' + overlap_str].append(tp)
+    if OVERLAPS:
+        for overlap_str in overlap_str_list:
+            true_vals_overlap, true_vals_k_overlap, true_vals_d_overlap, predicted_class_overlap, predicted_class_k_overlap, predicted_class_d_overlap = [], [], [], [], [], []
+    
+            for conv_key in list(set(list(overlaps[overlap_str].keys())).intersection(set(test_file_list))):
+                for g_f_key in list(overlaps[overlap_str + '/' + conv_key].keys()):
+                    g_f_key_not = deepcopy(data_select_dict[data_set_select])
+                    g_f_key_not.remove(g_f_key)
+                    for eval_indx, true_val in overlaps[overlap_str + '/' + conv_key + '/' + g_f_key]:
+                        # make sure the index is not out of bounds
+                        if eval_indx < len(results_dict[conv_key + '/' + g_f_key]):
+                            true_vals_overlap.append(true_val)
+                            if np.sum(results_dict[conv_key + '/' + g_f_key][eval_indx,
+                                      eval_window_start_point: eval_window_start_point + eval_window_length]) \
+                                    > np.sum(results_dict[conv_key + '/' + g_f_key_not[0]][eval_indx,
+                                             eval_window_start_point: eval_window_start_point + eval_window_length]):
+                                predicted_class_overlap.append(0)
+                            else:
+                                predicted_class_overlap.append(1)
+                            
+                            if g_f_key == 'k':
+                                true_vals_k_overlap.append(true_val)
+                                
+                                if np.sum(results_dict[conv_key + '/' + g_f_key][eval_indx,
+                                      eval_window_start_point: eval_window_start_point + eval_window_length]) \
+                                    > np.sum(results_dict[conv_key + '/' + g_f_key_not[0]][eval_indx,
+                                             eval_window_start_point: eval_window_start_point + eval_window_length]):
+                                    predicted_class_k_overlap.append(0)
+                                else:
+                                    predicted_class_k_overlap.append(1)
+                            
+                            elif g_f_key == 'd':
+                                true_vals_d_overlap.append(true_val)
+                                
+                                if np.sum(results_dict[conv_key + '/' + g_f_key][eval_indx,
+                                      eval_window_start_point: eval_window_start_point + eval_window_length]) \
+                                    > np.sum(results_dict[conv_key + '/' + g_f_key_not[0]][eval_indx,
+                                             eval_window_start_point: eval_window_start_point + eval_window_length]):
+                                    predicted_class_d_overlap.append(0)
+                                else:
+                                    predicted_class_d_overlap.append(1)
+                                
+            f_score = f1_score(true_vals_overlap, predicted_class_overlap, average='weighted')
+            print(overlap_str + ' f-score: ' + str(f_score))
+    
+            print('majority vote f-score:' + str(
+                f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
+            results_save['f_scores_' + overlap_str].append(f_score)
+            tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
+            
+            
+            if (len(set(true_vals_k_overlap))>=2):
+                tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k_overlap, predicted_class_k_overlap).ravel()
+            elif  (len(set(true_vals_k_overlap))==1):
+                if predicted_class_k_overlap == true_vals_k_overlap:
+                    if true_vals_k_overlap[0]==0:
+                        tn_k, fp_k, fn_k, tp_k = 0,0,1,0
+                    elif true_vals_k_overlap[0]==1:
+                        tn_k, fp_k, fn_k, tp_k = 0,0,0,1
+                else:
+                    if true_vals_k_overlap[0]==0:
+                        tn_k, fp_k, fn_k, tp_k = 0,1,0,0
+                    elif true_vals_k_overlap[0]==1:
+                        tn_k, fp_k, fn_k, tp_k = 1,0,0,0
+            else:
+                tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+            
+            if (len(set(true_vals_d_overlap))>=2):
+                tn_d, fp_d, fn_d, tp_d = confusion_matrix(true_vals_d_overlap, predicted_class_d_overlap).ravel()
+            elif  (len(set(true_vals_d_overlap))==1):
+                if predicted_class_d_overlap == true_vals_d_overlap:
+                    if true_vals_d_overlap[0]==0:
+                        tn_d, fp_d, fn_d, tp_d = 0,0,1,0
+                    elif true_vals_d_overlap[0]==1:
+                        tn_d, fp_d, fn_d, tp_d = 0,0,0,1
+                else:
+                    if true_vals_d_overlap[0]==0:
+                        tn_d, fp_d, fn_d, tp_d = 0,1,0,0
+                    elif true_vals_d_overlap[0]==1:
+                        tn_d, fp_d, fn_d, tp_d = 1,0,0,0
+            else:
+                tn_d, fp_d, fn_d, tp_d = 0,0,0,0
+            
+            results_save['tn_' + overlap_str].append(tn)
+            results_save['fp_' + overlap_str].append(fp)
+            results_save['fn_' + overlap_str].append(fn)
+            results_save['tp_' + overlap_str].append(tp)
+            
+            results_save['tn_k_' + overlap_str].append(tn_k)
+            results_save['fp_k_' + overlap_str].append(fp_k)
+            results_save['fn_k_' + overlap_str].append(fn_k)
+            results_save['tp_k_' + overlap_str].append(tp_k)
+            
+            results_save['tn_d_' + overlap_str].append(tn_d)
+            results_save['fp_d_' + overlap_str].append(fp_d)
+            results_save['fn_d_' + overlap_str].append(fn_d)
+            results_save['tp_d_' + overlap_str].append(tp_d)
     # get error per person
     bar_chart_labels = []
     bar_chart_vals = []
@@ -549,14 +799,20 @@ def test():
                                                                                                     prediction_length)
             bar_chart_labels.append(conv_key + '_' + g_f)
             bar_chart_vals.append(np.mean(losses_dict[conv_key + '/' + g_f]))
-
+    
     results_save['test_losses'].append(loss_weighted_mean)
     results_save['test_losses_l1'].append(loss_weighted_mean_l1)
-    #    results_save['test_losses_mse'].append(loss_weighted_mean_mse)
+    results_save['BCE_losses_test'].append(BCEloss_weighted_mean)
+    results_save['BCE_losses_test_d'].append(BCEloss_weighted_mean_d)
+    results_save['BCE_losses_test_k'].append(BCEloss_weighted_mean_k)
 
+    #    results_save['test_losses_mse'].append(loss_weighted_mean_mse)
+    
     indiv_perf = {'bar_chart_labels': bar_chart_labels,
                   'bar_chart_vals': bar_chart_vals}
     results_save['indiv_perf'].append(indiv_perf)
+    #    test()
+    model.train()
     # majority baseline:
     # f1_score(true_vals,np.zeros([len(true_vals),]).tolist(),average='weighted')
 
@@ -618,16 +874,40 @@ else:
     for lstm_key in model.lstm_dict.keys():
         optimizer_list.append(optim.Adam(model.lstm_dict[lstm_key].parameters(), lr=learning_rate, weight_decay=l2_dict[lstm_key]))
 
-
 results_save = dict()
-for pause_str in pause_str_list + overlap_str_list + onset_str_list:
-    results_save['f_scores_' + pause_str] = list()
-    results_save['tn_' + pause_str] = list()
-    results_save['fp_' + pause_str] = list()
-    results_save['fn_' + pause_str] = list()
-    results_save['tp_' + pause_str] = list()
+if OVERLAPS:
+    for pause_str in pause_str_list + overlap_str_list + onset_str_list:
+        results_save['f_scores_' + pause_str] = list()
+        results_save['tn_' + pause_str] = list()
+        results_save['fp_' + pause_str] = list()
+        results_save['fn_' + pause_str] = list()
+        results_save['tp_' + pause_str] = list()
+        
+        results_save['tn_k_' + pause_str] = list()
+        results_save['fp_k_' + pause_str] = list()
+        results_save['fn_k_' + pause_str] = list()
+        results_save['tp_k_' + pause_str] = list()
+        
+        results_save['tn_d_' + pause_str] = list()
+        results_save['fp_d_' + pause_str] = list()
+        results_save['fn_d_' + pause_str] = list()
+        results_save['tp_d_' + pause_str] = list()
+else:
+    for pause_str in pause_str_list  + onset_str_list:
+        results_save['f_scores_' + pause_str] = list()        
+        results_save['tn_' + pause_str] = list()
+        results_save['fp_' + pause_str] = list()
+        results_save['fn_' + pause_str] = list()
+        results_save['tp_' + pause_str] = list()
+        
+        results_save['tn_k_' + pause_str] = list()
+        results_save['fp_k_' + pause_str] = list()
+        results_save['fn_k_' + pause_str] = list()
+        results_save['tp_k_' + pause_str] = list()
 results_save['train_losses'], results_save['test_losses'], results_save['indiv_perf'], results_save[
-    'test_losses_l1'] = [], [], [], []
+    'test_losses_l1'], results_save['center_losses_train'],results_save['BCE_losses_train'],results_save[
+    'center_losses_test'],results_save['BCE_losses_test'], results_save['BCE_losses_test_d'], results_save['BCE_losses_test_k'] = [], [], [], [], [],[],[],[],[],[]
+
 
 
 # %% Training
@@ -714,9 +994,11 @@ for epoch in range(0, num_epochs):
             np.round(t_epoch_end - t_epoch_strt, 2),
             np.round(t_total_end - t_epoch_end, 2),
             np.round(t_total_end - t_epoch_strt, 2)))
-    if (epoch + 1 > patience) and \
-        (np.std(np.round(results_save['train_losses'][-patience:], 4))<Train_loss_range):
-        print('early stopping called at epoch: ' + str(epoch + 1))
+#    if (epoch + 1 > patience) and \
+#        (np.std(np.round(results_save['train_losses'][-patience:], 4))<Train_loss_range):
+#        print('early stopping called at epoch: ' + str(epoch + 1))
+    if epoch == FIXEPOCH:
+        print('early stopping called at epoch: ' + str(epoch))
         
         
         # =============================================================================

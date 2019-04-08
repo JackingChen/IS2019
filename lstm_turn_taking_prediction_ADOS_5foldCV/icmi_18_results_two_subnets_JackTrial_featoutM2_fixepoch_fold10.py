@@ -19,8 +19,8 @@ import itertools
 seq_length = 600
 no_subnets = False
 OVRLPS=False
-#experiment_top_path = './two_subnets_Model0_validate_{0}/'
-experiment_top_path = './two_subnets_Model0_comb2_new_{0}/'
+experiment_top_path = './two_subnets_Model2_fixepoch_10fold_{0}/'
+#experiment_top_path = './two_subnets_Model0_comb2_{0}/'
 Model=experiment_top_path.strip("./").split("_")[2]
 
 plat = platform.linux_distribution()[0]
@@ -42,31 +42,91 @@ patience = 10
 slow_test = True
 prediction_length=60
 
-combination=2
-ADOS_id=[['adircta'],['DMSpc0'],['DMSpc12'],['DMSpc4'],['DMSpcD'],['DMStC'],['IEDtT'],['IEDtT'],['IEDtTA'],['PALft'],['PALmsE'],['PALtTA'],['r_rpsty'],['r_var'],['rp_comis'],['SOCmM'],['SWMtE']]
 
-#ADOS_id=[list(i) for i in ADOS_id]
-returns=list(itertools.combinations(ADOS_id,combination))
-returns_lists=[]
-for i in returns:
-    lst=[]
-    for q in i:
-        lst+=list(q)
-    returns_lists.append(lst)
 
-#Delete the tried sequence
-#for ret_lst in returns_lists:    
-#    if ret_lst in exclude_lists:
-#        returns_lists.remove(ret_lst)
+#returns_lists=[
+## ['DMSpc4'],
+## ['IEDtTA'],
+## ['rp_comis'],
+## ['RTI1mT'],
+## ['RTI1rT'],
+## ['RTI5mT'],
+## ['RTI5rT'],
+## ['SOCstT'],
+## ['SWMtE8'],  
+# ['DMSA'],
+# ['DMSB'],
+# ['DMSmcLD'],
+# ['DMSmcLS'],
+# ['DMSpcD'],
+# ['DMSpcS'],
+# ['DMSpc0'],
+# ['DMSpc4'],
+# ['DMSpc12'],
+# ['DMSceP'],
+# ['DMSeeP'],
+# ['DMStC'],
+# ['DMStCD'],
+# ['DMStCS'],
+# ['DMStC0'],
+# ['DMStC4'],
+# ['DMStC12'],
+# 
+# ['IEDcsE'],
+# ['IEDcsT'],
+# ['IEDedE'],
+# ['IEDpedE'],
+# ['IEDcS'],
+# ['IEDtE'],
+# ['IEDtEA'],
+# ['IEDtT'],
+# ['IEDtTA'],
+# 
+# ['rn_omis'],
+# ['rp_omis'],
+# ['rn_comis'],
+# ['rp_comis'],
+# ['r_rt'],
+# ['r_rtsd'],
+# ['r_var'],
+# ['r_detect'],
+# ['r_rpsty'],
+# ['r_per'],
+# ['r_rtbc'],
+# ['r_sebc'],
+# ['r_rtisi'],
+# ['r_seisi'],
+# ]
 
+returns_lists=[['adircta'],
+ ['DMSpc0'],
+ ['DMSpc12'],
+ ['DMSpc4'],
+ ['DMSpcD'],
+ ['DMStC'],
+ ['IEDtE'],
+ ['IEDtT'],
+ ['IEDtTA'],
+ ['PALft'],
+ ['PALmsE'],
+ ['PALtTA'],
+ ['r_rpsty'],
+ ['r_var'],
+ ['rp_comis'],
+ ['SOCmM'],
+ ['SWMtE'],
+ ['SWMbE'],
+ ['SWMtE8']]
 
 for id_features in returns_lists:
     for training_i in range(5):        
         #    for prediction_length in range(90,180,30):
     #    train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
     #    test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
-        train_list_path = './data/splits/training_{0}.txt'.format(training_i%5)
-        test_list_path = './data/splits/testing_{0}.txt'.format(training_i%5)
+#        train_list_path = './data/splits/training_{0}.txt'.format(training_i)
+#        test_list_path = './data/splits/testing_{0}.txt'.format(training_i)
+        train_list_path = './data/splits10/training_{0}.txt'.format(training_i)
+        test_list_path = './data/splits10/testing_{0}.txt'.format(training_i)
         # train_list_path = './data/splits/training_dev_small.txt'
         # test_list_path = './data/splits/testing_dev_small.txt'
         
@@ -412,7 +472,7 @@ for id_features in returns_lists:
                     json_dict = json.dumps(json_dict)
                     arg_list = [json_dict]
                     my_env = {'CUDA_VISIBLE_DEVICES': str(gpu_select)}
-                    command = [py_env, './run_json_transfer.py'] + arg_list
+                    command = [py_env, './run_json_notransfer_featout_M2_fixepoch.py'] + arg_list
     #                command = [py_env, './run_json_transfer.py'] + arg_list
                     print(command)
                     print('\n *** \n')
@@ -484,22 +544,6 @@ for id_features in returns_lists:
                            }
         
             json.dump(report_dict, open(trial_path + '/report_dict.json', 'w'), indent=4, sort_keys=True)
-
-
-# create folder within loop number
-
-# %% run multiprocessing
-
-#param_list = []
-#for experiment_name, experiment_features_list, experiment_settings in zip(experiment_name_list,
-#                                                                          experiment_features_lists,
-#                                                                          experiment_settings_list):
-#    param_list.append([experiment_name, experiment_features_list, experiment_settings])
-#
-## if __name__=='__main__':
-##    p = multiprocessing.Pool(num_workers)
-##    p.map(run_trial,param_list)   
-#for params in param_list:
-#    run_trial(params)
-
-
+            name=experiment_name.replace("1+3_ADOS_","")
+subprocess.run('python ./feature_save/Aggregate_pkl.py {0}'.format(name),shell=True)
+subprocess.run('rm /home/jack/lstm_turn_taking_prediction_ADOS/feature_save/*.pkl',shell=True)
