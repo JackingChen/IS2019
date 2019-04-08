@@ -65,7 +65,7 @@ num_layers = 1
 onset_test_flag = True
 annotations_dir = './data/extracted_annotations/voice_activity/'
 
-#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50"}], "results_dir": "./no_subnets_transfer_0/1_Acous_50ms_baseline/test/", "name_append": "0_1_Acous_50ms_baseline_m_60_lr_01_l2e_0_l2o_-05_l2m_0001_dmo_5_dmi__seq_600", "no_subnets": true, "hidden_nodes_master": 60, "hidden_nodes_acous": 0, "hidden_nodes_visual": 0, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 1500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_3.txt", "test_list_path": "./data/splits/testing_3.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-05, "master": 0.0001, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}}']
+#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50"}], "results_dir": "./no_subnets_transfer_1/1_Acous_50ms_baseline/test/", "name_append": "4_1_Acous_50ms_baseline_m_60_lr_01_l2e_0_l2o_-05_l2m_0001_dmo_5_dmi__seq_600", "no_subnets": true, "hidden_nodes_master": 60, "hidden_nodes_acous": 0, "hidden_nodes_visual": 0, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 1500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_2.txt", "test_list_path": "./data/splits/testing_2.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-05, "master": 0.0001, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}}']
 
 proper_num_args = 2
 print('Number of arguments is: ' + str(len(argv)))
@@ -633,6 +633,11 @@ if OVERLAPS:
         results_save['fp_' + pause_str] = list()
         results_save['fn_' + pause_str] = list()
         results_save['tp_' + pause_str] = list()
+        
+        results_save['tn_k_' + pause_str] = list()
+        results_save['fp_k_' + pause_str] = list()
+        results_save['fn_k_' + pause_str] = list()
+        results_save['tp_k_' + pause_str] = list()
 else:
     for pause_str in pause_str_list  + onset_str_list:
         results_save['f_scores_' + pause_str] = list()        
@@ -640,6 +645,11 @@ else:
         results_save['fp_' + pause_str] = list()
         results_save['fn_' + pause_str] = list()
         results_save['tp_' + pause_str] = list()
+        
+        results_save['tn_k_' + pause_str] = list()
+        results_save['fp_k_' + pause_str] = list()
+        results_save['fn_k_' + pause_str] = list()
+        results_save['tp_k_' + pause_str] = list()
 results_save['train_losses'], results_save['test_losses'], results_save['indiv_perf'], results_save[
     'test_losses_l1'] = [], [], [], []
 
@@ -828,8 +838,11 @@ for epoch in range(0, num_epochs):
     # get hold-shift f-scores 
     for pause_str in pause_str_list:
         true_vals = list()
+        true_vals_k = list()
         predicted_class = list()
+        predicted_class_kid = list()
         for conv_key in test_file_list:
+            #Get both turntaking of doc and kid
             for g_f_key in list(hold_shift[pause_str + '/hold_shift' + '/' + conv_key].keys()):
                 g_f_key_not = deepcopy(data_select_dict[data_set_select])
                 g_f_key_not.remove(g_f_key)
@@ -837,12 +850,21 @@ for epoch in range(0, num_epochs):
                     # make sure the index is not out of bounds
                     if frame_indx < len(results_dict[conv_key + '/' + g_f_key]):
                         true_vals.append(true_val)
+                        if g_f_key=='k':
+                                true_vals_k.append(true_val)
                         if np.sum(
                                 results_dict[conv_key + '/' + g_f_key][frame_indx, 0:length_of_future_window]) > np.sum(
                                 results_dict[conv_key + '/' + g_f_key_not[0]][frame_indx, 0:length_of_future_window]):
                             predicted_class.append(0)
+                            #Get only turntaking of kid
+                            if g_f_key=='k':
+                                predicted_class_kid.append(0)
                         else:
                             predicted_class.append(1)
+                            #Get only turntaking of kid
+                            if g_f_key=='k':
+                                predicted_class_kid.append(1)
+
         f_score = f1_score(true_vals, predicted_class, average='weighted')
         results_save['f_scores_' + pause_str].append(f_score)
         if (len(set(true_vals))>=2):
@@ -860,10 +882,34 @@ for epoch in range(0, num_epochs):
                     tn, fp, fn, tp = 1,0,0,0
         else:
             tn, fp, fn, tp = 0,0,0,0
+
+        
+        if (len(set(true_vals_k))>=2):
+            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k, predicted_class_kid).ravel()
+        elif  (len(set(true_vals_k))==1):
+            if true_vals_k == predicted_class_kid:
+                if true_vals_k[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,1,0
+                elif true_vals_k[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,0,1
+            else:
+                if true_vals_k[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,1,0,0
+                elif true_vals_k[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 1,0,0,0
+        else:
+            tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+
+        
         results_save['tn_' + pause_str].append(tn)
         results_save['fp_' + pause_str].append(fp)
         results_save['fn_' + pause_str].append(fn)
         results_save['tp_' + pause_str].append(tp)
+        
+        results_save['tn_k_' + pause_str].append(tn_k)
+        results_save['fp_k_' + pause_str].append(fp_k)
+        results_save['fn_k_' + pause_str].append(fn_k)
+        results_save['tp_k_' + pause_str].append(tp_k)
         print('majority vote f-score(' + pause_str + '):' + str(
             f1_score(true_vals, np.zeros([len(predicted_class)]).tolist(), average='weighted')))
     # get prediction at onset f-scores 
@@ -892,7 +938,7 @@ for epoch in range(0, num_epochs):
         onset_thresh = thresholds[thresh_indx]
         onset_threshs.append(onset_thresh)
 
-        true_vals_onset, onset_test_mean_vals, predicted_class_onset = [], [], []
+        true_vals_onset, onset_test_mean_vals, predicted_class_onset, true_vals_k_onset,  predicted_class_kid_onset, onset_test_mean_vals_k= [], [], [], [], [], []
         for conv_key in list(set(test_file_list).intersection(onsets['short_long'].keys())):
             for g_f_key in list(onsets['short_long' + '/' + conv_key].keys()):
                 #                g_f_key_not = ['g','f']
@@ -903,17 +949,30 @@ for epoch in range(0, num_epochs):
                     if (frame_indx < len(results_dict[conv_key + '/' + g_f_key])) and not (
                     np.isnan(np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :]))):
                         true_vals_onset.append(true_val)
+                        
                         onset_mean = np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :])
                         onset_test_mean_vals.append(onset_mean)
                         if onset_mean > onset_thresh:
                             predicted_class_onset.append(1)  # long
                         else:
                             predicted_class_onset.append(0)  # short
+                        
+                        if g_f_key == 'k':
+                            true_vals_k_onset.append(true_val)
+                            onset_mean = np.mean(results_dict[conv_key + '/' + g_f_key][frame_indx, :])
+                            onset_test_mean_vals_k.append(onset_mean)
+                            if onset_mean > onset_thresh:
+                                predicted_class_kid_onset.append(1)  # long
+                            else:
+                                predicted_class_kid_onset.append(0)  # short
+                        
         f_score = f1_score(true_vals_onset, predicted_class_onset, average='weighted')
+        
         print(onset_str_list[0] + ' f-score: ' + str(f_score))
         print('majority vote f-score:' + str(
             f1_score(true_vals_onset, np.zeros([len(true_vals_onset), ]).tolist(), average='weighted')))
         results_save['f_scores_' + onset_str_list[0]].append(f_score)
+        
         if (len(set(true_vals_onset))>=2):
             tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
         elif  (len(set(true_vals_onset))==1):
@@ -929,6 +988,24 @@ for epoch in range(0, num_epochs):
                     tn, fp, fn, tp = 1,0,0,0
         else:
             tn,fp,fn,tp, = 0,0,0,0
+        
+        if (len(set(true_vals_k_onset))>=2):
+            tn_k, fp_k, fn_k, tp_k = confusion_matrix(true_vals_k_onset, predicted_class_kid_onset).ravel()
+        elif  (len(set(true_vals_k_onset))==1):
+            if predicted_class_kid_onset == true_vals_k_onset:
+                if true_vals_k_onset[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,1,0
+                elif true_vals_k_onset[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 0,0,0,1
+            else:
+                if true_vals_k_onset[0]==0:
+                    tn_k, fp_k, fn_k, tp_k = 0,1,0,0
+                elif true_vals_k_onset[0]==1:
+                    tn_k, fp_k, fn_k, tp_k = 1,0,0,0
+        else:
+            tn_k, fp_k, fn_k, tp_k = 0,0,0,0
+        
+
 #        if not(len(true_vals_onset) == 0):
 #            tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
 #        else:
@@ -937,7 +1014,11 @@ for epoch in range(0, num_epochs):
         results_save['fp_' + onset_str_list[0]].append(fp)
         results_save['fn_' + onset_str_list[0]].append(fn)
         results_save['tp_' + onset_str_list[0]].append(tp)
-
+        
+        results_save['tn_k_' + onset_str_list[0]].append(tn_k)
+        results_save['fp_k_' + onset_str_list[0]].append(fp_k)
+        results_save['fn_k_' + onset_str_list[0]].append(fn_k)
+        results_save['tp_k_' + onset_str_list[0]].append(tp_k)
     # get prediction at overlap f-scores
     if OVERLAPS:
         for overlap_str in overlap_str_list:

@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# something added
 import json
 # from subprocess import Popen,PIPE
 import subprocess

@@ -65,7 +65,7 @@ num_layers = 1
 onset_test_flag = True
 annotations_dir = './data/extracted_annotations/voice_activity/'
 
-#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50", "visual_as_id": false}, {"folder_path": "./data/extracted_Identities/", "features": ["DMSceP", "DMSeeP"], "modality": "visual", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "wrd_reg", "title_string": "_id", "use_glove": false, "glove_embed_table": "", "visual_as_id": true}], "results_dir": "./two_subnets_Model0_4_60/1+3_ADOS_DMScePDMSeeP/test/", "name_append": "1_1+3_ADOS_DMScePDMSeeP_m_60_a_60_v_4_lr_01_l2e_0_l2o_-07_l2m_-05_l2a__l2v__dmo_5_dmi_25_dao__dai__dvo_0_dvi__seq_600", "no_subnets": false, "hidden_nodes_master": 60, "hidden_nodes_acous": 60, "hidden_nodes_visual": 4, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_4.txt", "test_list_path": "./data/splits/testing_4.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-07, "master": 1e-05, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0.25, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}, "prediction_length": 60}']
+#argv=['./run_json_transfer.py',  '{"feature_dict_list": [{"folder_path": "./data/signals/gemaps_features_processed_50ms/znormalized", "features": ["F0semitoneFrom27.5Hz", "jitterLocal", "F1frequency", "F1bandwidth", "F2frequency", "F3frequency", "Loudness", "shimmerLocaldB", "HNRdBACF", "alphaRatio", "hammarbergIndex", "spectralFlux", "slope0-500", "slope500-1500", "F1amplitudeLogRelF0", "F2amplitudeLogRelF0", "F3amplitudeLogRelF0", "mfcc1", "mfcc2", "mfcc3", "mfcc4"], "modality": "acous", "is_h5_file": false, "uses_master_time_rate": true, "time_step_size": 1, "is_irregular": false, "short_name": "gmaps50"}], "results_dir": "./no_subnets_transfer_1/1_Acous_50ms_baseline/test/", "name_append": "4_1_Acous_50ms_baseline_m_60_lr_01_l2e_0_l2o_-05_l2m_0001_dmo_5_dmi__seq_600", "no_subnets": true, "hidden_nodes_master": 60, "hidden_nodes_acous": 0, "hidden_nodes_visual": 0, "learning_rate": 0.01, "sequence_length": 600, "num_epochs": 1500, "early_stopping": true, "patience": 10, "slow_test": true, "train_list_path": "./data/splits/training_2.txt", "test_list_path": "./data/splits/testing_2.txt", "use_date_str": false, "freeze_glove_embeddings": false, "grad_clip_bool": false, "l2_dict": {"emb": 0.0, "out": 1e-05, "master": 0.0001, "acous": 0, "visual": 0}, "dropout_dict": {"master_out": 0.5, "master_in": 0, "acous_in": 0, "acous_out": 0, "visual_in": 0, "visual_out": 0.0}}']
 
 proper_num_args = 2
 print('Number of arguments is: ' + str(len(argv)))
@@ -442,11 +442,25 @@ def test():
                             predicted_class.append(1)
         f_score = f1_score(true_vals, predicted_class, average='weighted')
         results_save['f_scores_' + pause_str].append(f_score)
-        #tn, fp, fn, tp = confusion_matrix(true_vals, predicted_class).ravel()
-        #results_save['tn_' + pause_str].append(tn)
-        #results_save['fp_' + pause_str].append(fp)
-        #results_save['fn_' + pause_str].append(fn)
-        #results_save['tp_' + pause_str].append(tp)
+        if (len(set(true_vals))>=2):
+            tn, fp, fn, tp = confusion_matrix(true_vals, predicted_class).ravel()
+        elif  (len(set(true_vals))==1):
+            if true_vals == predicted_class:
+                if true_vals[0]==0:
+                    tn, fp, fn, tp = 0,0,1,0
+                elif true_vals[0]==1:
+                    tn, fp, fn, tp = 0,0,0,1
+            else:
+                if true_vals[0]==0:
+                    tn, fp, fn, tp = 0,1,0,0
+                elif true_vals[0]==1:
+                    tn, fp, fn, tp = 1,0,0,0
+        else:
+            tn, fp, fn, tp = 0,0,0,0
+        results_save['tn_' + pause_str].append(tn)
+        results_save['fp_' + pause_str].append(fp)
+        results_save['fn_' + pause_str].append(fn)
+        results_save['tp_' + pause_str].append(tp)
         print('majority vote f-score(' + pause_str + '):' + str(
             f1_score(true_vals, np.zeros([len(predicted_class)]).tolist(), average='weighted')))
     # get prediction at onset f-scores 
@@ -497,14 +511,14 @@ def test():
         print('majority vote f-score:' + str(
             f1_score(true_vals_onset, np.zeros([len(true_vals_onset), ]).tolist(), average='weighted')))
         results_save['f_scores_' + onset_str_list[0]].append(f_score)
-#        if not(len(true_vals_onset) == 0):
-            #tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
-#        else:
-#            tn,fp,fn,tp, = 0,0,0,0
-        #results_save['tn_' + onset_str_list[0]].append(tn)
-        #results_save['fp_' + onset_str_list[0]].append(fp)
-        #results_save['fn_' + onset_str_list[0]].append(fn)
-        #results_save['tp_' + onset_str_list[0]].append(tp)
+        if not(len(true_vals_onset) == 0):
+            tn, fp, fn, tp = confusion_matrix(true_vals_onset, predicted_class_onset).ravel()
+        else:
+            tn,fp,fn,tp, = 0,0,0,0
+        results_save['tn_' + onset_str_list[0]].append(tn)
+        results_save['fp_' + onset_str_list[0]].append(fp)
+        results_save['fn_' + onset_str_list[0]].append(fn)
+        results_save['tp_' + onset_str_list[0]].append(tp)
 
     # get prediction at overlap f-scores
 
@@ -532,11 +546,11 @@ def test():
         print('majority vote f-score:' + str(
             f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
         results_save['f_scores_' + overlap_str].append(f_score)
-        #tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
-        #results_save['tn_' + overlap_str].append(tn)
-        #results_save['fp_' + overlap_str].append(fp)
-        #results_save['fn_' + overlap_str].append(fn)
-        #results_save['tp_' + overlap_str].append(tp)
+        tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
+        results_save['tn_' + overlap_str].append(tn)
+        results_save['fp_' + overlap_str].append(fp)
+        results_save['fn_' + overlap_str].append(fn)
+        results_save['tp_' + overlap_str].append(tp)
     # get error per person
     bar_chart_labels = []
     bar_chart_vals = []
@@ -560,55 +574,34 @@ def test():
 
 
 # %% Init model
-# model = LSTMPredictor(feature_size_dict, hidden_nodes, num_layers,train_batch_size,sequence_length,prediction_length,train_dataset.get_embedding_info(),dropout=dropout)
 embedding_info = train_dataset.get_embedding_info()
 #import glob
-fileexists = os. path. isfile('./model_save/checkpoint_60.pkl')
+#PATH="./model_save/checkpoint_{0}.pkl".format(prediction_length)
+PATH="./model_save/checkpoint.pkl"
+fileexists = False
 
 optimizer_list = []
 if fileexists:
     model = LSTMPredictor(lstm_settings_dict=lstm_settings_dict, feature_size_dict=feature_size_dict,
                           batch_size=train_batch_size, seq_length=sequence_length, prediction_length=prediction_length,
                           embedding_info=embedding_info)
-
-    PATH="./model_save/checkpoint_60.pkl"
-    print("Transfer learning: Initialize with model {0}".format(PATH))
+    
+    
     checkpoint = torch.load(PATH)
-#    model.load_state_dict(checkpoint['model_state_dict'])
-    # =============================================================================
-    #     Load hidden state
-    # =============================================================================
-    model.state_dict()['lstm_acous.bias_ih_l0']=checkpoint['model_state_dict']['lstm_master.bias_ih_l0']
-    model.state_dict()['lstm_acous.bias_hh_l0']=checkpoint['model_state_dict']['lstm_master.bias_hh_l0']
-    model.state_dict()['lstm_acous.weight_ih_l0']=checkpoint['model_state_dict']['lstm_master.weight_ih_l0']
-    model.state_dict()['lstm_acous.weight_hh_l0']=checkpoint['model_state_dict']['lstm_master.weight_hh_l0']
-    # =============================================================================
-    #     Load out state
-    # =============================================================================
-    model.state_dict()['out.weight']=checkpoint['model_state_dict']['out.weight']
-    model.state_dict()['out.bias']=checkpoint['model_state_dict']['out.bias']
-
+    model.load_state_dict(checkpoint['model_state_dict'])
     
     optimizer_list.append( optim.Adam( model.out.parameters(), lr=learning_rate, weight_decay=l2_dict['out'] ) )
-    optimizer_list[0].load_state_dict(checkpoint['optimizer_state_dict0'])#optimizer_state_dict0 = the out optimizer
     for lstm_key in model.lstm_dict.keys():
         optim_instance=optim.Adam(model.lstm_dict[lstm_key].parameters( ))
-        if lstm_key == 'acous':
-            optim_instance.load_state_dict(checkpoint['optimizer_state_dict1']) #optimizer_state_dict1 = the acous optimizer
 #        optim_instance.add_param_group({"params": torch.tensor([0])})        
         optimizer_list.append(optim_instance)              
-
+    for i,optimizer in enumerate(optimizer_list):
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'+str(i)])
     epoch = checkpoint['epoch']
     loss = checkpoint['loss']
     
     model.eval()
-    
-#    model = torch.load('./model_save/Model.pkl')
-##    model.eval()
-#    
-#    for file in sorted(glob.glob("./model_save/optimizer*")):
-#        optimizer=torch.load(file)
-#        optimizer_list.append(optimizer)
+
     
 else:
     model = LSTMPredictor(lstm_settings_dict=lstm_settings_dict, feature_size_dict=feature_size_dict,
@@ -647,7 +640,7 @@ if OVERLAPS:
         results_save['tp_k_' + pause_str] = list()
 else:
     for pause_str in pause_str_list  + onset_str_list:
-        results_save['f_scores_' + pause_str] = list()   
+        results_save['f_scores_' + pause_str] = list()        
         results_save['tn_' + pause_str] = list()
         results_save['fp_' + pause_str] = list()
         results_save['fn_' + pause_str] = list()
@@ -827,10 +820,8 @@ for epoch in range(0, num_epochs):
 # =============================================================================
         hiddenmasterh_bag.append(model.hiddenmaster1[0].squeeze().view(-1).cpu().data.numpy())
         hiddenmasterc_bag.append(model.hiddenmaster1[1].squeeze().view(-1).cpu().data.numpy())
-        hiddenacoush_bag.append(model.hiddenacous1[0].squeeze().view(-1).cpu().data.numpy())
-        hiddenacousc_bag.append(model.hiddenacous1[1].squeeze().view(-1).cpu().data.numpy())
         outmaster_bag.append(model.outmaster1[-1,:,:].view(-1).cpu().data.numpy())
-        outacous_bag.append(model.outacous1[-1,:,:].view(-1).cpu().data.numpy())
+
 
     # get weighted mean
     loss_weighted_mean = np.sum(np.array(batch_sizes) * np.squeeze(np.array(losses_test))) / np.sum(batch_sizes)
@@ -1054,11 +1045,11 @@ for epoch in range(0, num_epochs):
             print('majority vote f-score:' + str(
                 f1_score(true_vals_overlap, np.ones([len(true_vals_overlap), ]).tolist(), average='weighted')))
             results_save['f_scores_' + overlap_str].append(f_score)
-            #tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
-            #results_save['tn_' + overlap_str].append(tn)
-            #results_save['fp_' + overlap_str].append(fp)
-            #results_save['fn_' + overlap_str].append(fn)
-            #results_save['tp_' + overlap_str].append(tp)
+            tn, fp, fn, tp = confusion_matrix(true_vals_overlap, predicted_class_overlap).ravel()
+            results_save['tn_' + overlap_str].append(tn)
+            results_save['fp_' + overlap_str].append(fp)
+            results_save['fn_' + overlap_str].append(fn)
+            results_save['tp_' + overlap_str].append(tp)
     # get error per person
     bar_chart_labels = []
     bar_chart_vals = []
@@ -1101,24 +1092,19 @@ for epoch in range(0, num_epochs):
         '''
         # =============================================================================
         outname=train_list_path.replace(".txt",".pkl").split("/")[-1]
-        PATH="./feature_save/{0}".format(outname)
-        if not os.path.exists("./feature_save/"):
-            os.makedirs("./feature_save/")
+        PATH="./feature_save_baseline/{0}".format(outname)
+        if not os.path.exists("./feature_save_baseline/"):
+            os.makedirs("./feature_save_baseline/")
 
     
             
         feature_save={
             'hiddenmaster1': model.hiddenmaster1,
-            'hiddenacous1': model.hiddenacous1,
-            'outmaster1': model.outmaster1,
-            'outacous1':model.outacous1,
+#            'hiddenacous1': model.hiddenacous1,
             'hiddenmasterh_bag': hiddenmasterh_bag,
             'hiddenmasterc_bag': hiddenmasterc_bag,
-            'hiddenacoush_bag': hiddenacoush_bag,
-            'hiddenacousc_bag':hiddenacousc_bag,
-            'outmaster_bag': outmaster_bag,
-            'outacous_bag':outacous_bag,
-            'model':model
+#            'hiddenacoush_bag': hiddenacoush_bag,
+#            'hiddenacousc_bag':hiddenacousc_bag,
             }      
         torch.save(feature_save, PATH)
         break

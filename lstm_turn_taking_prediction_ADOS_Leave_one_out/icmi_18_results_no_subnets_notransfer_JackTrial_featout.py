@@ -262,7 +262,7 @@ for training_i in range(52):
 #    test_indices = [4]
     
     experiment_name_list = [
-        '1_Acous_50ms_baseline',
+        '1_Acous_50ms_notransfer_baseline',
 #        '1+2_ADOS_A',
 #        '1+3_ADOS_B',
 #        '1+4_ADOS_AB',
@@ -441,7 +441,7 @@ for training_i in range(52):
                 arg_list = [json_dict]
         #            cuda_var = randint(0,cuda_int)
                 my_env = {'CUDA_VISIBLE_DEVICES':str(gpu_select)}
-                command = [py_env, './run_json_transfer_featout_baseline.py'] + arg_list 
+                command = [py_env, './run_json_notransfer_featout_baseline.py'] + arg_list 
                 print(command)
                 print(test_path+name_append_test)
                 print('\n *** \n')
